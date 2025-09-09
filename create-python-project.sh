@@ -267,6 +267,12 @@ main() {
     print_info "  cd $target_dir"
     print_info "  nix develop"
     print_info "  nox"
+    
+    # Clean up template directory
+    print_info "Cleaning up template directory"
+    cd /
+    rm -rf "$template_dir/zamazingo"
+    print_success "Removed zamazingo directory"
 }
 
 # Run main function with all arguments
