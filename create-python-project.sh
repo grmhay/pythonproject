@@ -52,50 +52,36 @@ validate_project_name() {
     return 0
 }
 
-# Function to copy and rename files
-copy_and_rename() {
-    local template_dir="$1"
-    local target_dir="$2"
-    local old_name="$3"
-    local new_name="$4"
+# Function to rename the package directory
+rename_package_directory() {
+    local old_name="$1"
+    local new_name="$2"
     local python_name="${new_name//-/_}"
     
-    print_info "Copying template files to $target_dir"
-    
-    # Copy all files except .git directory
-    cp -r "$template_dir"/* "$target_dir/" 2>/dev/null || true
-    cp -r "$template_dir"/.[!.]* "$target_dir/" 2>/dev/null || true
-    
-    # Remove .git directory if it exists
-    if [[ -d "$target_dir/.git" ]]; then
-        rm -rf "$target_dir/.git"
-    fi
-    
     # Rename the main package directory
-    if [[ -d "$target_dir/$old_name" ]]; then
-        mv "$target_dir/$old_name" "$target_dir/$python_name"
+    if [[ -d "$old_name" ]]; then
+        mv "$old_name" "$python_name"
         print_success "Renamed directory: $old_name -> $python_name"
     fi
 }
 
 # Function to replace content in files
 replace_content() {
-    local target_dir="$1"
-    local old_name="$2"
-    local new_name="$3"
+    local old_name="$1"
+    local new_name="$2"
     local python_name="${new_name//-/_}"
     
     print_info "Replacing content in files"
     
     # Files to update
     local files_to_update=(
-        "$target_dir/pyproject.toml"
-        "$target_dir/noxfile.py"
-        "$target_dir/$python_name/__init__.py"
-        "$target_dir/$python_name/cli.py"
-        "$target_dir/$python_name/resources/__init__.py"
-        "$target_dir/tests/test_cli.py"
-        "$target_dir/tests/test_utils.py"
+        "pyproject.toml"
+        "noxfile.py"
+        "$python_name/__init__.py"
+        "$python_name/cli.py"
+        "$python_name/resources/__init__.py"
+        "tests/test_cli.py"
+        "tests/test_utils.py"
     )
     
     for file in "${files_to_update[@]}"; do
@@ -104,7 +90,7 @@ replace_content() {
             sed -i "s/$old_name/$python_name/g" "$file"
             
             # In pyproject.toml, also update the project name (which can have hyphens)
-            if [[ "$file" == *"pyproject.toml" ]]; then
+            if [[ "$file" == "pyproject.toml" ]]; then
                 sed -i "s/name = \"$python_name\"/name = \"$new_name\"/" "$file"
                 sed -i "s/prog_name=\"$python_name\"/prog_name=\"$new_name\"/" "$file"
             fi
@@ -122,16 +108,19 @@ replace_content() {
 
 # Function to initialize git repository
 init_git() {
-    local target_dir="$1"
-    local project_name="$2"
-    
-    cd "$target_dir"
+    local project_name="$1"
     
     if command -v git &> /dev/null; then
-        git init
-        git add .
-        git commit -m "Initial commit: $project_name project from template"
-        print_success "Initialized git repository"
+        if [[ -d ".git" ]]; then
+            print_info "Git repository already exists, adding changes"
+            git add .
+            git commit -m "Renamed template to $project_name"
+        else
+            git init
+            git add .
+            git commit -m "Initial commit: $project_name project from template"
+        fi
+        print_success "Git repository updated"
     else
         print_warning "Git not found, skipping repository initialization"
     fi
@@ -139,10 +128,9 @@ init_git() {
 
 # Function to update README
 update_readme() {
-    local target_dir="$1"
-    local project_name="$2"
+    local project_name="$1"
     
-    local readme_file="$target_dir/README.md"
+    local readme_file="README.md"
     if [[ -f "$readme_file" ]]; then
         # Create a new README with project-specific content
         cat > "$readme_file" << EOF
@@ -204,23 +192,24 @@ EOF
 
 # Main function
 main() {
-    local template_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local project_name="$1"
-    local target_dir="$2"
     
     # Show usage if no arguments provided
     if [[ $# -eq 0 ]]; then
-        echo "Usage: $0 <project-name> [target-directory]"
+        echo "Usage: $0 <project-name>"
         echo ""
-        echo "Creates a new Python project from the zamazingo template"
+        echo "Configures the current zamazingo template for a new project"
+        echo ""
+        echo "This script should be run from a cloned zamazingo template directory."
+        echo "It will rename the package directory and update all references to use"
+        echo "the new project name."
         echo ""
         echo "Arguments:"
         echo "  project-name      Name of the new project (required)"
-        echo "  target-directory  Directory to create the project in (optional, defaults to ./project-name)"
         echo ""
         echo "Examples:"
         echo "  $0 my-awesome-cli"
-        echo "  $0 data-processor /path/to/projects/"
+        echo "  $0 data-processor"
         exit 1
     fi
     
@@ -229,42 +218,32 @@ main() {
         exit 1
     fi
     
-    # Set default target directory if not provided
-    if [[ -z "$target_dir" ]]; then
-        target_dir="./$project_name"
-    fi
-    
-    # Convert target_dir to absolute path
-    target_dir="$(realpath "$target_dir" 2>/dev/null || echo "$target_dir")"
-    
-    # Check if target directory already exists
-    if [[ -d "$target_dir" ]]; then
-        print_error "Target directory '$target_dir' already exists"
+    # Check if we're in a zamazingo template directory
+    if [[ ! -d "zamazingo" ]]; then
+        print_error "zamazingo directory not found. Are you running this from a cloned template?"
         exit 1
     fi
     
-    print_info "Creating new Python project: $project_name"
-    print_info "Template directory: $template_dir"
-    print_info "Target directory: $target_dir"
+    print_info "Configuring template for project: $project_name"
     
-    # Create target directory
-    mkdir -p "$target_dir"
-    
-    # Copy and rename files
-    copy_and_rename "$template_dir" "$target_dir" "zamazingo" "$project_name"
+    # Rename the package directory
+    rename_package_directory "zamazingo" "$project_name"
     
     # Replace content in files
-    replace_content "$target_dir" "zamazingo" "$project_name"
+    replace_content "zamazingo" "$project_name"
     
     # Update README
-    update_readme "$target_dir" "$project_name"
+    update_readme "$project_name"
     
-    # Initialize git repository
-    init_git "$target_dir" "$project_name"
+    # Initialize/update git repository
+    init_git "$project_name"
     
-    print_success "Project '$project_name' created successfully!"
+    # Remove the setup script since it's no longer needed
+    print_info "Removing setup script"
+    rm -f "create-python-project.sh"
+    
+    print_success "Project '$project_name' configured successfully!"
     print_info "To get started:"
-    print_info "  cd $target_dir"
     print_info "  nix develop"
     print_info "  nox"
 }
