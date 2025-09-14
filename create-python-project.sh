@@ -106,24 +106,147 @@ replace_content() {
     done
 }
 
-# Function to initialize git repository
+# Function to validate git remote URL
+validate_git_url() {
+    local url="$1"
+    
+    # Basic validation for common git URL formats
+    if [[ "$url" =~ ^https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
+       [[ "$url" =~ ^git@github\.com:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
+       [[ "$url" =~ ^https://gitlab\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
+       [[ "$url" =~ ^git@gitlab\.com:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
+       [[ "$url" =~ ^https://[a-zA-Z0-9.-]+/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to get user choice for git configuration
+get_git_choice() {
+    echo ""
+    print_info "Git repository configuration options:"
+    echo "1) Keep existing git history and update remote URL"
+    echo "2) Start fresh (remove git history and initialize new repository)"
+    echo "3) Keep existing git history and remote (no changes)"
+    echo "4) Skip git configuration entirely"
+    echo ""
+    
+    while true; do
+        read -p "Choose an option [1-4]: " choice
+        case $choice in
+            [1-4]) echo "$choice"; break;;
+            *) print_warning "Please enter a number between 1 and 4";;
+        esac
+    done
+}
+
+# Function to get new remote URL from user
+get_remote_url() {
+    local project_name="$1"
+    
+    echo ""
+    print_info "Enter the URL for your new git repository."
+    print_info "Examples:"
+    print_info "  https://github.com/username/$project_name.git"
+    print_info "  git@github.com:username/$project_name.git"
+    echo ""
+    
+    while true; do
+        read -p "Remote URL: " remote_url
+        
+        if [[ -z "$remote_url" ]]; then
+            print_warning "URL cannot be empty. Please enter a valid git repository URL."
+            continue
+        fi
+        
+        if validate_git_url "$remote_url"; then
+            echo "$remote_url"
+            break
+        else
+            print_warning "Invalid URL format. Please enter a valid git repository URL."
+            print_info "Supported formats: GitHub, GitLab HTTPS/SSH URLs"
+        fi
+    done
+}
+
+# Function to initialize git repository with remote configuration
 init_git() {
     local project_name="$1"
     
-    if command -v git &> /dev/null; then
-        if [[ -d ".git" ]]; then
-            print_info "Git repository already exists, adding changes"
+    if ! command -v git &> /dev/null; then
+        print_warning "Git not found, skipping repository initialization"
+        return 0
+    fi
+    
+    # Check if we're in a git repository
+    if [[ ! -d ".git" ]]; then
+        print_info "No git repository found, initializing new repository"
+        git init
+        git add .
+        git commit -m "Initial commit: $project_name project from template"
+        print_success "New git repository initialized"
+        return 0
+    fi
+    
+    # We have an existing git repository, get user preference
+    local current_remote=$(git remote get-url origin 2>/dev/null || echo "")
+    
+    if [[ -n "$current_remote" ]]; then
+        print_info "Current git remote origin: $current_remote"
+    else
+        print_info "No git remote origin configured"
+    fi
+    
+    local choice=$(get_git_choice)
+    
+    case $choice in
+        1)
+            # Update remote URL
+            local new_remote=$(get_remote_url "$project_name")
+            
+            if [[ -n "$current_remote" ]]; then
+                git remote set-url origin "$new_remote"
+                print_success "Updated git remote origin to: $new_remote"
+            else
+                git remote add origin "$new_remote"
+                print_success "Added git remote origin: $new_remote"
+            fi
+            
             git add .
-            git commit -m "Renamed template to $project_name"
-        else
+            git commit -m "Configured template for project: $project_name"
+            
+            print_info "To push to your new repository, run:"
+            print_info "  git push -u origin main"
+            ;;
+        2)
+            # Start fresh - remove git history
+            print_info "Removing existing git history..."
+            rm -rf .git
+            
             git init
             git add .
             git commit -m "Initial commit: $project_name project from template"
-        fi
-        print_success "Git repository updated"
-    else
-        print_warning "Git not found, skipping repository initialization"
-    fi
+            
+            print_success "Fresh git repository initialized"
+            print_info "To add a remote and push, run:"
+            print_info "  git remote add origin <your-repo-url>"
+            print_info "  git push -u origin main"
+            ;;
+        3)
+            # Keep everything as-is
+            git add .
+            git commit -m "Configured template for project: $project_name"
+            print_success "Git repository updated (remote unchanged)"
+            ;;
+        4)
+            # Skip git configuration
+            print_info "Skipping git configuration"
+            return 0
+            ;;
+    esac
+    
+    print_success "Git configuration completed"
 }
 
 # Function to update README
@@ -201,8 +324,13 @@ main() {
         echo "Configures the current zamazingo template for a new project"
         echo ""
         echo "This script should be run from a cloned zamazingo template directory."
-        echo "It will rename the package directory and update all references to use"
-        echo "the new project name."
+        echo "It will rename the package directory, update all references to use"
+        echo "the new project name, and configure git repository settings."
+        echo ""
+        echo "Git Configuration:"
+        echo "  - If a git repository exists, you'll be prompted to configure the remote"
+        echo "  - Options include updating the remote URL, starting fresh, or keeping as-is"
+        echo "  - URL validation ensures proper git repository format"
         echo ""
         echo "Arguments:"
         echo "  project-name      Name of the new project (required)"
