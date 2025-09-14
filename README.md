@@ -69,3 +69,8 @@ nix run
 ```sh
 nix run . -- --name=there --count=3
 ```
+
+## Developing this project
+Because running the create-python-project.sh script ultimately deletes the script, you have to clone the repo locally, edit the script if that is what you are working on, commit and push the change then test it.
+
+If it all goes to cr*p then you can just sudo \rm -r pythonproject and clone it again.
