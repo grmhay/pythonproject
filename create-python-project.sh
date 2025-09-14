@@ -122,34 +122,37 @@ validate_git_url() {
     fi
 }
 
-# Function to get user choice for git configuration
-get_git_choice() {
+# Function to display git configuration options
+display_git_options() {
     echo ""
     print_info "Git repository configuration options:"
     echo ""
-    echo "1) Keep existing git history and update remote URL"
-    echo "   - Preserves all existing commits and history"
-    echo "   - Changes the remote origin URL to a new repository"
-    echo "   - Commits the template configuration changes"
-    echo "   - Prompts you to enter a new git remote URL"
+    print_info "1) Keep existing git history and update remote URL"
+    print_info "   - Preserves all existing commits and history"
+    print_info "   - Changes the remote origin URL to a new repository"
+    print_info "   - Commits the template configuration changes"
+    print_info "   - Prompts you to enter a new git remote URL"
     echo ""
-    echo "2) Start fresh (remove git history and initialize new repository)"
-    echo "   - Deletes the .git directory (removes all history)"
-    echo "   - Initializes a brand new git repository"
-    echo "   - Makes an initial commit with the configured template"
-    echo "   - No remote is configured (you'd add one manually later)"
+    print_info "2) Start fresh (remove git history and initialize new repository)"
+    print_info "   - Deletes the .git directory (removes all history)"
+    print_info "   - Initializes a brand new git repository"
+    print_info "   - Makes an initial commit with the configured template"
+    print_info "   - No remote is configured (you'd add one manually later)"
     echo ""
-    echo "3) Keep existing git history and remote (no changes)"
-    echo "   - Preserves existing commits, history, and remote URL"
-    echo "   - Only commits the template configuration changes"
-    echo "   - No changes to git remote configuration"
+    print_info "3) Keep existing git history and remote (no changes)"
+    print_info "   - Preserves existing commits, history, and remote URL"
+    print_info "   - Only commits the template configuration changes"
+    print_info "   - No changes to git remote configuration"
     echo ""
-    echo "4) Skip git configuration entirely"
-    echo "   - Makes no git-related changes at all"
-    echo "   - Leaves the repository exactly as it was"
-    echo "   - Useful if you want to handle git setup manually later"
+    print_info "4) Skip git configuration entirely"
+    print_info "   - Makes no git-related changes at all"
+    print_info "   - Leaves the repository exactly as it was"
+    print_info "   - Useful if you want to handle git setup manually later"
     echo ""
-    
+}
+
+# Function to get user choice for git configuration
+get_git_choice() {
     while true; do
         read -p "Choose an option [1-4]: " choice
         case $choice in
@@ -216,6 +219,7 @@ init_git() {
         print_info "No git remote origin configured"
     fi
     
+    display_git_options
     local choice=$(get_git_choice)
     
     case $choice in
