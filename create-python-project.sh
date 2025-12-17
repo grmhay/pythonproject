@@ -65,35 +65,6 @@ rename_package_directory() {
     fi
 }
 
-# Function to rename the parent directory
-rename_parent_directory() {
-    local new_name="$1"
-    local current_dir=$(basename "$PWD")
-    local parent_dir=$(dirname "$PWD")
-    local new_path="$parent_dir/$new_name"
-    
-    # Only rename if current directory name is different from new name
-    if [[ "$current_dir" != "$new_name" ]]; then
-        # Check if target directory already exists
-        if [[ -e "$new_path" ]]; then
-            print_warning "Directory '$new_path' already exists, skipping parent directory rename"
-            return 0
-        fi
-        
-        print_info "Renaming parent directory: $current_dir -> $new_name"
-        
-        # Move to parent directory, rename, then move back
-        cd "$parent_dir"
-        mv "$current_dir" "$new_name"
-        cd "$new_name"
-        
-        print_success "Renamed parent directory: $current_dir -> $new_name"
-        print_info "Working directory is now: $(pwd)"
-    else
-        print_info "Parent directory already has the correct name: $current_dir"
-    fi
-}
-
 # Function to replace content in files
 replace_content() {
     local old_name="$1"
@@ -375,9 +346,8 @@ main() {
         echo "Configures the current zamazingo template for a new project"
         echo ""
         echo "This script should be run from a cloned zamazingo template directory."
-        echo "It will rename both the package directory and parent directory,"
-        echo "update all references to use the new project name, and configure"
-        echo "git repository settings."
+        echo "It will rename the package directory, update all references to use"
+        echo "the new project name, and configure git repository settings."
         echo ""
         echo "Git Configuration:"
         echo "  - If a git repository exists, you'll be prompted to configure the remote"
@@ -405,13 +375,10 @@ main() {
     fi
     
     print_info "Configuring template for project: $project_name"
-    
+
     # Rename the package directory
     rename_package_directory "zamazingo" "$project_name"
-    
-    # Rename the parent directory to match the project name
-    rename_parent_directory "$project_name"
-    
+
     # Replace content in files
     replace_content "zamazingo" "$project_name"
     
