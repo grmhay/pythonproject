@@ -137,7 +137,8 @@ display_git_options() {
 
 get_git_choice() {
     while true; do
-        read -p "Choose an option [1-4]: " choice
+        read -p "Choose an option [1-4] (default: 2): " choice
+        choice="${choice:-2}"
         case $choice in
             [1-4]) echo "$choice"; break;;
             *) print_warning "Please enter a number between 1 and 4";;
