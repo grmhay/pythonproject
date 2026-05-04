@@ -242,7 +242,7 @@ update_readme() {
         cat > "$readme_file" << EOF
 # $project_name
 
-A Python CLI application created from the zamazingo template.
+A Python CLI application.
 
 ## Develop
 
