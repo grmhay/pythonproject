@@ -108,6 +108,7 @@
               pkgs.python3Packages.pylsp-mypy
               pkgs.python3Packages.pylsp-rope
               pkgs.python3Packages.python-lsp-ruff
+              pkgs.pre-commit
             ];
           };
         };
