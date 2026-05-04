@@ -140,7 +140,7 @@ get_git_choice() {
         if read -t 10 -p "Choose an option [1-4] (default: 2 in 10s): " choice; then
             choice="${choice:-2}"
         else
-            echo ""
+            echo "" >&2
             choice="2"
         fi
         case $choice in
