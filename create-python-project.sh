@@ -25,6 +25,13 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+check_dependencies() {
+    if ! command -v nix &> /dev/null; then
+        print_error "nix is not installed. Install it from https://nixos.org/download before continuing."
+        exit 1
+    fi
+}
+
 validate_project_name() {
     local name="$1"
     if [[ -z "$name" ]]; then
@@ -337,6 +344,8 @@ main() {
         echo "  $0 data-processor"
         exit 1
     fi
+
+    check_dependencies
 
     if ! validate_project_name "$project_name"; then
         exit 1
