@@ -300,28 +300,18 @@ setup_claude_skills() {
     print_info "Installing community skills..."
 
     if ! command -v npx &> /dev/null; then
-        print_warning "npx not found — install community skills manually after setup:"
-        print_warning "  npx skills add aiherohq/skills/write-a-skill"
-        print_warning "  npx skills add aiherohq/skills/write-a-prd"
-        print_warning "  npx skills add aiherohq/skills/prd-to-plan"
-        print_warning "  npx skills add aiherohq/skills/prd-to-issues"
-        print_warning "  npx skills add aiherohq/skills/grill-me"
+        print_warning "npx not found — install grill-me manually after setup:"
+        print_warning "  npx skills@latest add mattpocock/skills/grill-me"
         return 0
     fi
 
-    local skills=(
-        "aiherohq/skills/write-a-skill"
-        "aiherohq/skills/write-a-prd"
-        "aiherohq/skills/prd-to-plan"
-        "aiherohq/skills/prd-to-issues"
-        "aiherohq/skills/grill-me"
-    )
-    for skill in "${skills[@]}"; do
-        print_info "Installing: $skill"
-        npx skills add "$skill" || print_warning "Failed to install $skill — install manually later"
-    done
+    print_info "Installing: mattpocock/skills/grill-me"
+    npx skills@latest add mattpocock/skills/grill-me --yes \
+        || print_warning "Failed to install grill-me — install manually with: npx skills@latest add mattpocock/skills/grill-me"
 
     print_success "Community skills installed"
+    print_info "Bundled skills (write-a-prd, write-a-skill, prd-to-plan) are pre-installed in .claude/skills/"
+    print_warning "prd-to-issues not yet available — add manually when source is found"
 }
 
 main() {
