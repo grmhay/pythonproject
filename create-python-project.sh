@@ -297,21 +297,8 @@ EOF
 }
 
 setup_claude_skills() {
-    print_info "Installing community skills..."
-
-    if ! command -v npx &> /dev/null; then
-        print_warning "npx not found — install grill-me manually after setup:"
-        print_warning "  npx skills@latest add mattpocock/skills/grill-me"
-        return 0
-    fi
-
-    print_info "Installing: mattpocock/skills/grill-me"
-    npx skills@latest add mattpocock/skills/grill-me --yes \
-        || print_warning "Failed to install grill-me — install manually with: npx skills@latest add mattpocock/skills/grill-me"
-
-    print_success "Community skills installed"
-    print_info "Bundled skills (write-a-prd, write-a-skill, prd-to-plan) are pre-installed in .claude/skills/"
-    print_warning "prd-to-issues not yet available — add manually when source is found"
+    print_info "Community skills are managed globally via claudesetup."
+    print_info "If not already installed, run: bash install.sh from https://github.com/grmhay/claudesetup"
 }
 
 main() {
