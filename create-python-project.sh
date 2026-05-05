@@ -1,4 +1,4 @@
-#!/run/current-system/sw/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -7,23 +7,14 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+print_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+print_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+# ── Dependency checks ─────────────────────────────────────────────────────────
 
 check_dependencies() {
     if ! command -v nix &> /dev/null; then
@@ -31,6 +22,8 @@ check_dependencies() {
         exit 1
     fi
 }
+
+# ── Validation ────────────────────────────────────────────────────────────────
 
 validate_project_name() {
     local name="$1"
@@ -49,6 +42,8 @@ validate_project_name() {
     fi
     return 0
 }
+
+# ── Package renaming ──────────────────────────────────────────────────────────
 
 rename_package_directory() {
     local old_name="$1"
@@ -93,6 +88,142 @@ replace_content() {
         fi
     done
 }
+
+update_readme() {
+    local project_name="$1"
+    local readme_file="README.md"
+    if [[ -f "$readme_file" ]]; then
+        cat > "$readme_file" << EOF
+# $project_name
+
+A Python CLI application.
+
+## Develop
+
+Enter the Nix shell with:
+
+\`\`\`sh
+nix develop
+\`\`\`
+
+Then run the tests with:
+
+\`\`\`sh
+nox
+\`\`\`
+
+To see the available sessions, run:
+
+\`\`\`sh
+nox --list
+\`\`\`
+
+To format the codebase:
+
+\`\`\`sh
+nox -s format -- --fix
+\`\`\`
+
+## Build
+
+To check and build the package, run:
+
+\`\`\`sh
+nix build
+\`\`\`
+
+## Run
+
+To run the package, use:
+
+\`\`\`sh
+nix run
+\`\`\`
+
+... and with arguments:
+
+\`\`\`sh
+nix run . -- --name=there --count=3
+\`\`\`
+EOF
+        print_success "Updated README.md"
+    fi
+}
+
+# ── Dev rails setup ───────────────────────────────────────────────────────────
+
+setup_dev_rails() {
+    print_info "Setting up dev rails..."
+
+    # Add pre-commit to flake.nix dev shell
+    if grep -q "pre-commit" flake.nix; then
+        print_warning "pre-commit already present in flake.nix — skipping."
+    else
+        if grep -q "ipython" flake.nix; then
+            sed -i 's/ipython/ipython\n            pre-commit/' flake.nix
+            print_success "Added pre-commit to flake.nix."
+        else
+            print_warning "Could not auto-patch flake.nix — add 'pre-commit' to devShell packages manually."
+        fi
+    fi
+
+    # Create .pre-commit-config.yaml
+    if [[ -f .pre-commit-config.yaml ]]; then
+        print_warning ".pre-commit-config.yaml already exists — skipping."
+    else
+        cat > .pre-commit-config.yaml << 'EOF'
+repos:
+  - repo: local
+    hooks:
+      - id: nox
+        name: nox
+        entry: nox
+        language: system
+        pass_filenames: false
+        always_run: true
+EOF
+        print_success "Created .pre-commit-config.yaml."
+    fi
+
+    # Create prd/ and plans/ directories
+    mkdir -p prd plans
+    touch prd/.gitkeep plans/.gitkeep
+    print_success "Created prd/ and plans/ directories."
+
+    # Append dev rails section to CLAUDE.md
+    local DEV_RAILS_MARKER="## Dev rails"
+    if grep -q "${DEV_RAILS_MARKER}" CLAUDE.md 2>/dev/null; then
+        print_warning "Dev rails section already present in CLAUDE.md — skipping."
+    else
+        cat >> CLAUDE.md << 'EOF'
+
+## Dev rails
+
+### Environment
+- Always work inside `nix develop`; never use pip or venv directly
+- Run `nox` to validate all five sessions: taplo → format → check → mypy → pytest
+
+### Code conventions
+- Every module must have a corresponding test file in `tests/`
+- Annotate every function — mypy strict is enforced
+- Write doctests in pure utility functions (they run via `--doctest-modules`)
+- Use `importlib.resources` to access files in the package `resources/` directory
+- Use `importlib.metadata` for version retrieval; never hardcode version strings
+
+### Feedback loops
+Run before committing: `nox`
+Run a single session: `nox -s mypy`, `nox -s pytest`, `nox -s check`
+Auto-fix formatting: `nox -s format -- --fix`
+
+### Planning artefacts
+- PRD files live in `prd/`
+- Implementation plans live in `plans/`
+EOF
+        print_success "Dev rails section appended to CLAUDE.md."
+    fi
+}
+
+# ── Git setup ─────────────────────────────────────────────────────────────────
 
 validate_git_url() {
     local url="$1"
@@ -235,71 +366,7 @@ init_git() {
     print_success "Git configuration completed"
 }
 
-update_readme() {
-    local project_name="$1"
-    local readme_file="README.md"
-    if [[ -f "$readme_file" ]]; then
-        cat > "$readme_file" << EOF
-# $project_name
-
-A Python CLI application.
-
-## Develop
-
-Enter the Nix shell with:
-
-\`\`\`sh
-nix develop
-\`\`\`
-
-Then run the tests with:
-
-\`\`\`sh
-nox
-\`\`\`
-
-To see the available sessions, run:
-
-\`\`\`sh
-nox --list
-\`\`\`
-
-To format the codebase:
-
-\`\`\`sh
-nox -s format -- --fix
-\`\`\`
-
-## Build
-
-To check and build the package, run:
-
-\`\`\`sh
-nix build
-\`\`\`
-
-## Run
-
-To run the package, use:
-
-\`\`\`sh
-nix run
-\`\`\`
-
-... and with arguments:
-
-\`\`\`sh
-nix run . -- --name=there --count=3
-\`\`\`
-EOF
-        print_success "Updated README.md"
-    fi
-}
-
-setup_claude_skills() {
-    print_info "Community skills are managed globally via claudesetup."
-    print_info "If not already installed, run: bash install.sh from https://github.com/grmhay/claudesetup"
-}
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 main() {
     local project_name="$1"
@@ -307,16 +374,8 @@ main() {
     if [[ $# -eq 0 ]]; then
         echo "Usage: $0 <project-name>"
         echo ""
-        echo "Configures the current zamazingo template for a new project"
-        echo ""
-        echo "This script should be run from a cloned zamazingo template directory."
-        echo "It will rename the package directory, update all references to use"
-        echo "the new project name, and configure git repository settings."
-        echo ""
-        echo "Git Configuration:"
-        echo "  - If a git repository exists, you'll be prompted to configure the remote"
-        echo "  - Options include updating the remote URL, starting fresh, or keeping as-is"
-        echo "  - URL validation ensures proper git repository format"
+        echo "Bootstraps a new Python project from the pythonproject template."
+        echo "Renames the package, wires up dev rails, and configures git."
         echo ""
         echo "Arguments:"
         echo "  project-name      Name of the new project (required)"
@@ -343,7 +402,7 @@ main() {
     rename_package_directory "zamazingo" "$project_name"
     replace_content "zamazingo" "$project_name"
     update_readme "$project_name"
-    setup_claude_skills
+    setup_dev_rails
 
     init_git "$project_name"
 
@@ -351,10 +410,15 @@ main() {
     rm -f "create-python-project.sh"
 
     print_success "Project '$project_name' configured successfully!"
-    print_info "Next steps:"
-    print_info "  nix develop"
-    print_info "  nox                        # verify baseline passes"
-    print_info "  pre-commit install         # wire up the git hook"
+    echo ""
+    print_info "Next steps (run inside 'nix develop'):"
+    print_info "  1. nix develop"
+    print_info "  2. nox                    # verify baseline passes"
+    print_info "  3. pre-commit install     # wire up the git hook"
+    print_info "  4. /setup-dev-rails       # in Claude Code — installs skills, customises CLAUDE.md"
+    echo ""
+    print_info "Note: community Claude skills are installed by /setup-dev-rails in Claude Code."
+    print_info "Machine-level skills (setup-dev-rails, omarchy) require claudesetup — see https://github.com/grmhay/claudesetup"
 }
 
 main "$@"
