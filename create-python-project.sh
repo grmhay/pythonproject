@@ -23,6 +23,19 @@ check_dependencies() {
     fi
 }
 
+# Issue #7: ensure nix experimental features are enabled
+check_nix_config() {
+    local nix_conf="${HOME}/.config/nix/nix.conf"
+    if grep -q "experimental-features" "$nix_conf" 2>/dev/null; then
+        return 0
+    fi
+    print_warning "Nix experimental features (nix-command, flakes) are not enabled."
+    print_info "Configuring ~/.config/nix/nix.conf..."
+    mkdir -p "${HOME}/.config/nix"
+    echo "experimental-features = nix-command flakes" >> "$nix_conf"
+    print_success "Nix experimental features enabled. 'nix develop' will now work."
+}
+
 # ── Validation ────────────────────────────────────────────────────────────────
 
 validate_project_name() {
@@ -243,26 +256,9 @@ display_git_options() {
     print_info "Git repository configuration options:"
     echo ""
     print_info "1) Keep existing git history and update remote URL"
-    print_info "   - Preserves all existing commits and history"
-    print_info "   - Changes the remote origin URL to a new repository"
-    print_info "   - Commits the template configuration changes"
-    print_info "   - Prompts you to enter a new git remote URL"
-    echo ""
     print_info "2) Start fresh (remove git history and initialize new repository)"
-    print_info "   - Deletes the .git directory (removes all history)"
-    print_info "   - Initializes a brand new git repository"
-    print_info "   - Makes an initial commit with the configured template"
-    print_info "   - No remote is configured (you'd add one manually later)"
-    echo ""
     print_info "3) Keep existing git history and remote (no changes)"
-    print_info "   - Preserves existing commits, history, and remote URL"
-    print_info "   - Only commits the template configuration changes"
-    print_info "   - No changes to git remote configuration"
-    echo ""
     print_info "4) Skip git configuration entirely"
-    print_info "   - Makes no git-related changes at all"
-    print_info "   - Leaves the repository exactly as it was"
-    print_info "   - Useful if you want to handle git setup manually later"
     echo ""
 }
 
@@ -305,20 +301,101 @@ get_remote_url() {
     done
 }
 
+# Issue #8: offer to create GitHub repo after fresh init
+setup_github_remote() {
+    local project_name="$1"
+
+    if ! command -v gh &>/dev/null; then
+        print_warning "gh CLI not found — skipping GitHub remote setup."
+        print_info "Install gh from https://cli.github.com then run:"
+        print_info "  gh repo create $project_name --public"
+        print_info "  git remote add origin <url>"
+        print_info "  git push -u origin master"
+        return 0
+    fi
+
+    if ! gh auth status &>/dev/null 2>&1; then
+        print_warning "gh CLI not authenticated — run 'gh auth login' then set up the remote manually."
+        return 0
+    fi
+
+    echo ""
+    local visibility=""
+    read -t 15 -p "Create GitHub repo '$project_name'? [y/N] " create_repo || true
+    if [[ ! "$create_repo" =~ ^[Yy]$ ]]; then
+        print_info "Skipping GitHub remote setup."
+        print_info "To set up later: gh repo create $project_name --public && git remote add origin <url> && git push -u origin master"
+        return 0
+    fi
+
+    read -t 10 -p "Visibility — public or private? [public/private] (default: public): " visibility || true
+    visibility="${visibility:-public}"
+    if [[ "$visibility" != "private" ]]; then
+        visibility="public"
+    fi
+
+    print_info "Creating GitHub repo '$project_name' ($visibility)..."
+    gh repo create "$project_name" "--${visibility}" --source=. --remote=origin --push
+    print_success "GitHub repo created and pushed: https://github.com/$(gh api user --jq .login)/$project_name"
+}
+
 init_git() {
     local project_name="$1"
+    local git_mode="${2:-}"  # Issue #3: optional non-interactive mode
+
     if ! command -v git &> /dev/null; then
         print_warning "Git not found, skipping repository initialization"
         return 0
     fi
+
+    # No existing repo — just init fresh
     if [[ ! -d ".git" ]]; then
         print_info "No git repository found, initializing new repository"
         git init
         git add .
         git commit -m "Initial commit: $project_name project from template"
         print_success "New git repository initialized"
+        setup_github_remote "$project_name"
         return 0
     fi
+
+    # Non-interactive mode (Issue #3)
+    if [[ -n "$git_mode" ]]; then
+        case "$git_mode" in
+            fresh)
+                print_info "Git mode: fresh"
+                rm -rf .git
+                git init
+                git add .
+                git commit -m "Initial commit: $project_name project from template"
+                print_success "Fresh git repository initialized"
+                setup_github_remote "$project_name"
+                ;;
+            keep-remote)
+                print_info "Git mode: keep-remote"
+                git add .
+                git commit -m "Configured template for project: $project_name"
+                print_success "Git repository updated (remote unchanged)"
+                ;;
+            keep)
+                print_info "Git mode: keep"
+                git add .
+                git commit -m "Configured template for project: $project_name"
+                print_success "Git repository updated (remote unchanged)"
+                ;;
+            skip)
+                print_info "Git mode: skip — skipping git configuration"
+                ;;
+            *)
+                print_error "Unknown --git-mode value '$git_mode'. Use: fresh, keep-remote, keep, skip"
+                exit 1
+                ;;
+        esac
+        print_success "Git configuration completed"
+        return 0
+    fi
+
+    # Interactive mode
     local current_remote=$(git remote get-url origin 2>/dev/null || echo "")
     if [[ -n "$current_remote" ]]; then
         print_info "Current git remote origin: $current_remote"
@@ -339,8 +416,7 @@ init_git() {
             fi
             git add .
             git commit -m "Configured template for project: $project_name"
-            print_info "To push to your new repository, run:"
-            print_info "  git push -u origin main"
+            print_info "To push: git push -u origin master"
             ;;
         2)
             print_info "Removing existing git history..."
@@ -349,9 +425,7 @@ init_git() {
             git add .
             git commit -m "Initial commit: $project_name project from template"
             print_success "Fresh git repository initialized"
-            print_info "To add a remote and push, run:"
-            print_info "  git remote add origin <your-repo-url>"
-            print_info "  git push -u origin main"
+            setup_github_remote "$project_name"
             ;;
         3)
             git add .
@@ -369,24 +443,42 @@ init_git() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 main() {
-    local project_name="$1"
-
     if [[ $# -eq 0 ]]; then
-        echo "Usage: $0 <project-name>"
+        echo "Usage: $0 <project-name> [--git-mode=fresh|keep-remote|keep|skip]"
         echo ""
         echo "Bootstraps a new Python project from the pythonproject template."
         echo "Renames the package, wires up dev rails, and configures git."
         echo ""
-        echo "Arguments:"
-        echo "  project-name      Name of the new project (required)"
+        echo "Options:"
+        echo "  --git-mode=fresh        Start fresh (remove history, new repo)  [default]"
+        echo "  --git-mode=keep-remote  Keep history, commit changes, keep remote"
+        echo "  --git-mode=keep         Alias for keep-remote"
+        echo "  --git-mode=skip         Skip all git configuration"
         echo ""
         echo "Examples:"
         echo "  $0 my-awesome-cli"
-        echo "  $0 data-processor"
+        echo "  $0 my-awesome-cli --git-mode=keep-remote"
         exit 1
     fi
 
+    local project_name="$1"
+    local git_mode=""
+
+    # Parse flags
+    for arg in "${@:2}"; do
+        case "$arg" in
+            --git-mode=*)
+                git_mode="${arg#--git-mode=}"
+                ;;
+            *)
+                print_error "Unknown argument: $arg"
+                exit 1
+                ;;
+        esac
+    done
+
     check_dependencies
+    check_nix_config
 
     if ! validate_project_name "$project_name"; then
         exit 1
@@ -404,7 +496,7 @@ main() {
     update_readme "$project_name"
     setup_dev_rails
 
-    init_git "$project_name"
+    init_git "$project_name" "$git_mode"
 
     print_info "Removing setup script"
     rm -f "create-python-project.sh"
@@ -417,8 +509,7 @@ main() {
     print_info "  3. pre-commit install     # wire up the git hook"
     print_info "  4. /setup-dev-rails       # in Claude Code — installs skills, customises CLAUDE.md"
     echo ""
-    print_info "Note: community Claude skills are installed by /setup-dev-rails in Claude Code."
-    print_info "Machine-level skills (setup-dev-rails, omarchy) require claudesetup — see https://github.com/grmhay/claudesetup"
+    print_info "Machine-level Claude skills: https://github.com/grmhay/claudesetup"
 }
 
 main "$@"
