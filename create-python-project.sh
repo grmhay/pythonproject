@@ -464,10 +464,10 @@ setup_github_remote() {
         return 0
     fi
 
-    read -t 10 -p "Visibility — public or private? [public/private] (default: public): " visibility || true
-    visibility="${visibility:-public}"
-    if [[ "$visibility" != "private" ]]; then
-        visibility="public"
+    read -t 10 -p "Visibility — public or private? [public/private] (default: private): " visibility || true
+    visibility="${visibility:-private}"
+    if [[ "$visibility" != "public" ]]; then
+        visibility="private"
     fi
 
     print_info "Creating GitHub repo '$project_name' ($visibility)..."
