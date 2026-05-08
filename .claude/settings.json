@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nox)",
+      "Bash(nox -s *)",
+      "Bash(nox -k *)",
+      "Bash(nox --list)",
+      "Bash(ruff check *)",
+      "Bash(ruff format *)",
+      "Bash(mypy *)",
+      "Bash(pytest *)",
+      "Bash(taplo *)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add *)",
+      "Bash(git commit*)"
+    ]
+  }
+}
