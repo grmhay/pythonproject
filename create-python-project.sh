@@ -71,6 +71,7 @@ rename_package_directory() {
 replace_content() {
     local old_name="$1"
     local new_name="$2"
+    local project_type="${3:-cli}"
     local python_name="${new_name//-/_}"
 
     print_info "Replacing content in files"
@@ -81,8 +82,10 @@ replace_content() {
         "CLAUDE.md"
         "$python_name/__init__.py"
         "$python_name/cli.py"
+        "$python_name/api.py"
         "$python_name/resources/__init__.py"
         "tests/test_cli.py"
+        "tests/test_api.py"
         "tests/test_utils.py"
     )
 
@@ -97,19 +100,82 @@ replace_content() {
                 sed -i "s/prog_name=\"$python_name\"/prog_name=\"$new_name\"/" "$file"
                 sed -i "s/I am $python_name/I am $new_name/g" "$file"
             fi
+            if [[ "$file" == *"api.py" ]]; then
+                sed -i "s/title=\"$python_name\"/title=\"$new_name\"/" "$file"
+            fi
             print_success "Updated: $file"
         fi
     done
+
+    # Remove files not needed for this project type
+    case "$project_type" in
+        cli)
+            rm -f "$python_name/api.py" "tests/test_api.py"
+            print_info "Removed API files (CLI-only project)"
+            ;;
+        api)
+            rm -f "$python_name/cli.py" "tests/test_cli.py"
+            print_info "Removed CLI files (API-only project)"
+            ;;
+        both)
+            print_info "Keeping both CLI and API files"
+            ;;
+    esac
+}
+
+patch_for_type() {
+    local python_name="$1"
+    local new_name="$2"
+    local project_type="$3"
+
+    [[ "$project_type" == "cli" ]] && return 0
+
+    print_info "Patching project files for type: $project_type"
+
+    case "$project_type" in
+        api)
+            sed -i 's/dependencies = \["click"\]/dependencies = ["fastapi", "uvicorn[standard]"]/' pyproject.toml
+            sed -i 's/test = \["mypy", "nox", "pytest", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "ruff"]/' pyproject.toml
+            sed -i "s/${python_name} = \"${python_name}\.cli:main\"/${python_name} = \"${python_name}.api:run\"/" pyproject.toml
+            sed -i 's/Yet Another Python CLI Application/Yet Another Python API/' pyproject.toml
+            sed -i 's/keywords = \["cli"\]/keywords = ["api"]/' pyproject.toml
+            sed -i '/"Environment :: Console",/d' pyproject.toml
+            sed -i 's/a CLI tool/an API/' "${python_name}/__init__.py"
+            sed -i 's/pkgs\.python3Packages\.click/pkgs.python3Packages.fastapi\n            pkgs.python3Packages.uvicorn/' flake.nix
+            sed -i 's/pkgs\.python3Packages\.pytest$/pkgs.python3Packages.pytest\n            pkgs.python3Packages.httpx/' flake.nix
+            print_success "Patched for API: fastapi+uvicorn deps, api entrypoint."
+            ;;
+        both)
+            sed -i 's/dependencies = \["click"\]/dependencies = ["click", "fastapi", "uvicorn[standard]"]/' pyproject.toml
+            sed -i 's/test = \["mypy", "nox", "pytest", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "ruff"]/' pyproject.toml
+            sed -i "/${python_name} = \"${python_name}\.cli:main\"/a ${new_name}-api = \"${python_name}.api:run\"" pyproject.toml
+            sed -i 's/Yet Another Python CLI Application/Yet Another Python Application/' pyproject.toml
+            sed -i 's/keywords = \["cli"\]/keywords = ["cli", "api"]/' pyproject.toml
+            sed -i 's/a CLI tool/a CLI tool and API/' "${python_name}/__init__.py"
+            sed -i 's/pkgs\.python3Packages\.click/pkgs.python3Packages.click\n            pkgs.python3Packages.fastapi\n            pkgs.python3Packages.uvicorn/' flake.nix
+            sed -i 's/pkgs\.python3Packages\.pytest$/pkgs.python3Packages.pytest\n            pkgs.python3Packages.httpx/' flake.nix
+            print_success "Patched for CLI+API: click+fastapi+uvicorn deps, both entrypoints."
+            ;;
+    esac
 }
 
 update_readme() {
     local project_name="$1"
+    local project_type="${2:-cli}"
     local readme_file="README.md"
+
+    local type_desc
+    case "$project_type" in
+        cli)  type_desc="A Python CLI application." ;;
+        api)  type_desc="A Python API application." ;;
+        both) type_desc="A Python application with CLI and API." ;;
+    esac
+
     if [[ -f "$readme_file" ]]; then
         cat > "$readme_file" << EOF
 # $project_name
 
-A Python CLI application.
+$type_desc
 
 ## Develop
 
@@ -146,8 +212,13 @@ nix build
 \`\`\`
 
 ## Run
+EOF
 
-To run the package, use:
+        case "$project_type" in
+            cli)
+                cat >> "$readme_file" << EOF
+
+To run the CLI, use:
 
 \`\`\`sh
 nix run
@@ -159,6 +230,41 @@ nix run
 nix run . -- --name=there --count=3
 \`\`\`
 EOF
+                ;;
+            api)
+                cat >> "$readme_file" << EOF
+
+To start the API server:
+
+\`\`\`sh
+nix run
+\`\`\`
+
+The API will be available at <http://localhost:8000>.
+Docs at <http://localhost:8000/docs>.
+EOF
+                ;;
+            both)
+                cat >> "$readme_file" << EOF
+
+Inside \`nix develop\`, run the CLI:
+
+\`\`\`sh
+$project_name --name=there --count=3
+\`\`\`
+
+Start the API server:
+
+\`\`\`sh
+${project_name}-api
+\`\`\`
+
+The API will be available at <http://localhost:8000>.
+Docs at <http://localhost:8000/docs>.
+EOF
+                ;;
+        esac
+
         print_success "Updated README.md"
     fi
 }
@@ -469,29 +575,38 @@ init_git() {
 
 main() {
     if [[ $# -eq 0 ]]; then
-        echo "Usage: $0 <project-name> [--git-mode=fresh|keep-remote|keep|skip]"
+        echo "Usage: $0 <project-name> [--type=cli|api|both] [--git-mode=fresh|keep-remote|keep|skip]"
         echo ""
         echo "Bootstraps a new Python project from the pythonproject template."
         echo "Renames the package, wires up dev rails, and configures git."
         echo ""
         echo "Options:"
-        echo "  --git-mode=fresh        Start fresh (remove history, new repo)  [default]"
+        echo "  --type=cli              CLI project using Click              [default]"
+        echo "  --type=api              FastAPI project"
+        echo "  --type=both             CLI + FastAPI in one project"
+        echo "  --git-mode=fresh        Start fresh (remove history, new repo)"
         echo "  --git-mode=keep-remote  Keep history, commit changes, keep remote"
         echo "  --git-mode=keep         Alias for keep-remote"
         echo "  --git-mode=skip         Skip all git configuration"
         echo ""
         echo "Examples:"
         echo "  $0 my-awesome-cli"
+        echo "  $0 my-awesome-api --type=api"
+        echo "  $0 my-awesome-app --type=both"
         echo "  $0 my-awesome-cli --git-mode=keep-remote"
         exit 1
     fi
 
     local project_name="$1"
+    local project_type="cli"
     local git_mode=""
 
     # Parse flags
     for arg in "${@:2}"; do
         case "$arg" in
+            --type=*)
+                project_type="${arg#--type=}"
+                ;;
             --git-mode=*)
                 git_mode="${arg#--git-mode=}"
                 ;;
@@ -501,6 +616,11 @@ main() {
                 ;;
         esac
     done
+
+    case "$project_type" in
+        cli|api|both) ;;
+        *) print_error "Unknown --type value '$project_type'. Use: cli, api, both"; exit 1 ;;
+    esac
 
     check_dependencies
     check_nix_config
@@ -514,11 +634,14 @@ main() {
         exit 1
     fi
 
-    print_info "Configuring template for project: $project_name"
+    local python_name="${project_name//-/_}"
+
+    print_info "Configuring template for project: $project_name (type: $project_type)"
 
     rename_package_directory "zamazingo" "$project_name"
-    replace_content "zamazingo" "$project_name"
-    update_readme "$project_name"
+    replace_content "zamazingo" "$project_name" "$project_type"
+    patch_for_type "$python_name" "$project_name" "$project_type"
+    update_readme "$project_name" "$project_type"
     setup_dev_rails
     install_skills
 
