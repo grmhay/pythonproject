@@ -527,13 +527,26 @@ main() {
     print_info "Removing setup script"
     rm -f "create-python-project.sh"
 
+    # Rename the project directory if it is still called 'pythonproject'
+    local current_dir
+    current_dir="$(basename "$PWD")"
+    if [[ "$current_dir" == "pythonproject" ]]; then
+        local parent_dir
+        parent_dir="$(dirname "$PWD")"
+        cd "$parent_dir"
+        mv "pythonproject" "$project_name"
+        print_success "Renamed project directory: pythonproject → $project_name"
+        cd "$project_name"
+    fi
+
     print_success "Project '$project_name' configured successfully!"
     echo ""
     print_info "Next steps (run inside 'nix develop'):"
-    print_info "  1. nix develop"
-    print_info "  2. nox                    # verify baseline passes"
-    print_info "  3. pre-commit install     # wire up the git hook"
-    print_info "  4. /setup-dev-rails       # in Claude Code — runs /setup-matt-pocock-skills, customises CLAUDE.md"
+    print_info "  1. cd ../$project_name    # if not already there"
+    print_info "  2. nix develop"
+    print_info "  3. nox                    # verify baseline passes"
+    print_info "  4. pre-commit install     # wire up the git hook"
+    print_info "  5. /setup-dev-rails       # in Claude Code — runs /setup-matt-pocock-skills, customises CLAUDE.md"
     echo ""
     print_info "Machine-level Claude skills: https://github.com/grmhay/claudesetup"
 }
