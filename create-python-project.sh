@@ -80,6 +80,7 @@ replace_content() {
         "pyproject.toml"
         "noxfile.py"
         "CLAUDE.md"
+        "Dockerfile"
         "$python_name/__init__.py"
         "$python_name/cli.py"
         "$python_name/api.py"
@@ -102,6 +103,10 @@ replace_content() {
             fi
             if [[ "$file" == *"api.py" ]]; then
                 sed -i "s/title=\"$python_name\"/title=\"$new_name\"/" "$file"
+            fi
+            if [[ "$file" == "Dockerfile" ]]; then
+                # The CLI entrypoint command uses hyphens (new_name), not underscores (python_name)
+                sed -i "s/ENTRYPOINT \[\"$python_name\"\]/ENTRYPOINT [\"$new_name\"]/" "$file"
             fi
             print_success "Updated: $file"
         fi
