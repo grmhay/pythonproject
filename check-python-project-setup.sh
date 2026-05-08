@@ -22,9 +22,9 @@ skip() { echo -e "${YELLOW}[SKIP]${NC} $1 (manual check required)"; }
 echo "Checking project at: $(pwd)"
 echo "────────────────────────────────────────────────────"
 
-# 1. Package renamed from zamazingo
+# 1. Package renamed from zamazingo (exclude DEV_RAILS.md which references it as a placeholder)
 if grep -r --include="*.py" --include="*.toml" --include="*.nix" --include="*.md" \
-     -l "zamazingo" . 2>/dev/null | grep -qv ".git"; then
+     -l "zamazingo" . 2>/dev/null | grep -qv ".git\|DEV_RAILS.md"; then
   fail "Package still named 'zamazingo' — run create-python-project.sh"
 else
   ok "Package renamed from 'zamazingo'"
