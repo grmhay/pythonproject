@@ -16,7 +16,8 @@ Linting:         ruff (85+ rules)
 Formatting:      ruff format + taplo (TOML)
 Task runner:     nox
 Pre-commit:      pre-commit framework (via Nix)
-CLI framework:   click
+CLI framework:   click          (--type=cli, --type=both)
+API framework:   FastAPI        (--type=api, --type=both)
 Tracking:        GitHub issues
 ```
 
@@ -42,11 +43,20 @@ This installs the `/setup-dev-rails` and `/omarchy` skills into `~/.claude/skill
 ```bash
 git clone https://github.com/grmhay/pythonproject
 cd pythonproject
-bash create-python-project.sh <your-project-name>
+bash create-python-project.sh <your-project-name> [--type=cli|api|both]
 ```
+
+`--type` controls what gets generated (default: `cli`):
+
+| Flag | What you get |
+|------|-------------|
+| `--type=cli` | Click CLI entry point (`cli.py`) |
+| `--type=api` | FastAPI app (`api.py`) + uvicorn runner; click removed |
+| `--type=both` | Both `cli.py` and `api.py`; all deps included |
 
 The script will:
 - Rename all references from `zamazingo` to your package name
+- Patch `pyproject.toml` and `flake.nix` for the chosen type (deps, entrypoints, classifiers)
 - Add `pre-commit` to `flake.nix`, create `.pre-commit-config.yaml`
 - Create `prd/` and `plans/` directories
 - Append dev rails rules to `CLAUDE.md`
@@ -98,7 +108,9 @@ pre-commit install
 
 ## Phase 3: Project Structure
 
-The template uses a flat package layout (package at root, not under `src/`):
+The template uses a flat package layout (package at root, not under `src/`).
+
+**`--type=cli` (default):**
 
 ```
 my-project/
@@ -113,6 +125,30 @@ my-project/
 │   ├── __init__.py
 │   ├── test_cli.py          # uses click.testing.CliRunner
 │   └── test_utils.py
+...
+```
+
+**`--type=api`:**
+
+```
+my-project/
+├── my_package/
+│   ├── __init__.py
+│   ├── api.py               # FastAPI app + uvicorn runner
+│   ├── utils.py
+│   └── resources/
+├── tests/
+│   ├── __init__.py
+│   ├── test_api.py          # uses fastapi.testclient.TestClient
+│   └── test_utils.py
+...
+```
+
+**`--type=both`:** includes `cli.py`, `api.py`, `test_cli.py`, and `test_api.py`.
+
+Common files regardless of type:
+
+```
 ├── prd/                     # pre-created in template
 ├── plans/                   # pre-created in template
 ├── .claude/
@@ -426,9 +462,10 @@ Architecture review?
 Context getting high?
   → commit, /clear, start fresh
 
-Build / run the CLI?
+Build / run?
   → nix build
-  → nix run
+  → nix run                    # CLI (--type=cli or --type=both default script)
+  → my-project-api             # API server (--type=api or --type=both, inside nix develop)
 ```
 
 ---

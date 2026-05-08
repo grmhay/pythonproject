@@ -7,15 +7,29 @@ This is a template for creating modern Python CLI applications with comprehensiv
 To create a new project from this template:
 
 1. Clone or download this repository
-2. Run the configuration script with your desired project name:
+2. Run the configuration script with your desired project name and type:
 
 ```sh
+# CLI project (default)
 ./create-python-project.sh my-project-name
+
+# FastAPI project
+./create-python-project.sh my-project-name --type=api
+
+# CLI + FastAPI in one project
+./create-python-project.sh my-project-name --type=both
 ```
+
+| `--type` | Entry point | Dependencies |
+|----------|-------------|--------------|
+| `cli` (default) | `cli.py` via Click | `click` |
+| `api` | `api.py` via FastAPI + uvicorn | `fastapi`, `uvicorn[standard]`, `httpx` (test) |
+| `both` | `cli.py` + `api.py` | all of the above |
 
 **Important**: The `create-python-project.sh` script is a one-time use script that configures the template for your new project. After running it:
 - The script renames the `zamazingo` package directory to your project name
 - Updates all references throughout the codebase
+- Patches `pyproject.toml` and `flake.nix` for the chosen project type
 - Updates the README with project-specific content
 - Commits the changes to git
 - **Removes itself** - the script deletes itself after successful configuration
