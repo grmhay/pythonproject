@@ -70,6 +70,16 @@ nix run
 nix run . -- --name=there --count=3
 ```
 
+## Verifying a project setup
+
+After bootstrapping a project, you can verify it is fully configured by running:
+
+```sh
+bash check-python-project-setup.sh /path/to/your/project
+```
+
+This checks package renaming, nix config, pre-commit hooks, prd/plans directories, CLAUDE.md, all Matt Pocock skills, and machine-level Claude skills.
+
 ## Developing this project
 Because running the create-python-project.sh script ultimately deletes the script, you have to clone the repo locally, edit the script if that is what you are working on, commit and push the change then test it.
 
