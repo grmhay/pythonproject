@@ -32,9 +32,10 @@ Before setting up any project, ensure your global Claude skills are installed:
 git clone https://github.com/grmhay/claudesetup
 cd claudesetup
 bash install.sh
+cd .. && rm -rf claudesetup
 ```
 
-This installs the `/setup-dev-rails` and `/omarchy` skills into `~/.claude/skills/`. Community skills are installed per-project by `/setup-dev-rails` in Claude Code.
+This installs the `/setup-dev-rails` and `/omarchy` skills into `~/.claude/skills/`. The clone is no longer needed once installed. Community skills are installed per-project by `create-python-project.sh`.
 
 ### 1.2 Clone the template and run the generator script
 
