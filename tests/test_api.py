@@ -1,6 +1,6 @@
 """This module provides tests for the API module."""
 
-# ruff: noqa: S101
+# ruff: noqa: S101,PLR2004
 
 from fastapi.testclient import TestClient
 
