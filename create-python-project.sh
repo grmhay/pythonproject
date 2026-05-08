@@ -236,6 +236,22 @@ EOF
     fi
 }
 
+# ── Skills setup ─────────────────────────────────────────────────────────────
+
+install_skills() {
+    print_info "Installing Matt Pocock skills into .claude/skills/..."
+
+    if ! command -v npx &>/dev/null; then
+        print_warning "npx not found — skipping skills install. Install Node.js then run:"
+        print_warning "  npx skills@latest add mattpocock/skills"
+        return 0
+    fi
+
+    npx skills@latest add mattpocock/skills --yes \
+        && print_success "Matt Pocock skills installed into .claude/skills/" \
+        || print_warning "Skills install failed — run 'npx skills@latest add mattpocock/skills' manually"
+}
+
 # ── Git setup ─────────────────────────────────────────────────────────────────
 
 validate_git_url() {
@@ -495,6 +511,7 @@ main() {
     replace_content "zamazingo" "$project_name"
     update_readme "$project_name"
     setup_dev_rails
+    install_skills
 
     init_git "$project_name" "$git_mode"
 
@@ -507,7 +524,7 @@ main() {
     print_info "  1. nix develop"
     print_info "  2. nox                    # verify baseline passes"
     print_info "  3. pre-commit install     # wire up the git hook"
-    print_info "  4. /setup-dev-rails       # in Claude Code — installs skills, customises CLAUDE.md"
+    print_info "  4. /setup-dev-rails       # in Claude Code — runs /setup-matt-pocock-skills, customises CLAUDE.md"
     echo ""
     print_info "Machine-level Claude skills: https://github.com/grmhay/claudesetup"
 }
