@@ -167,15 +167,21 @@ Skills come from two places:
 | `/setup-dev-rails` | Finish wiring up dev rails interactively in Claude Code |
 | `/omarchy` | Customise the Omarchy Linux desktop |
 
-**Project-level** — installed into `.claude/skills/` per project by `/setup-dev-rails`:
+**Project-level** — installed into `.claude/skills/` per project by `create-python-project.sh` via `npx skills@latest add mattpocock/skills`:
 
-| Skill | Source |
-|-------|--------|
-| `/write-a-prd` | `aiherohq/skills/write-a-prd` |
-| `/write-a-skill` | `aiherohq/skills/write-a-skill` |
-| `/prd-to-plan` | `aiherohq/skills/prd-to-plan` |
-| `/prd-to-issues` | `aiherohq/skills/prd-to-issues` |
-| `/grill-me` | `aiherohq/skills/grill-me` |
+| Skill | Purpose |
+|-------|---------|
+| `/grill-with-docs` | Interrogate a feature idea to clarity |
+| `/to-prd` | Write a PRD from a grilled idea |
+| `/to-issues` | Generate GitHub issues from a PRD |
+| `/tdd` | Red-green-refactor, one test at a time |
+| `/diagnose` | Debug a hard problem systematically |
+| `/improve-codebase-architecture` | Architectural review |
+| `/zoom-out` | Step back and review overall direction |
+| `/triage` | Label and prioritise open issues |
+| `/grill-me` | Stress-test your own thinking |
+| `/write-a-skill` | Create a new Claude skill |
+| `/setup-matt-pocock-skills` | Configure issue tracker and docs location |
 
 ### Verify skills are available
 
@@ -191,13 +197,21 @@ After setup, open Claude Code in the project and run:
 
 Use this before starting any feature that spans more than one session.
 
-### 6.1 Run the PRD skill
+### 6.1 Interrogate the idea
 
 ```
-/write-a-prd
+/grill-with-docs
 ```
 
-Answer its questions one at a time. Don't rush — the interrogation is the value. Output: a `prd/feature-name.md` file.
+Describe the feature. The skill asks probing questions to surface assumptions and constraints. Don't rush — the interrogation is the value.
+
+### 6.2 Write the PRD
+
+```
+/to-prd
+```
+
+Turns the grilled idea into a structured PRD. Output: a `prd/feature-name.md` file.
 
 ### PRD structure to expect
 
@@ -222,21 +236,21 @@ What are we building?
 - [explicit exclusions]
 ```
 
-### 6.2 Optionally stress-test with `/grill-me`
+### 6.3 Optionally stress-test with `/grill-me`
 
-Run `/grill-me` on your PRD before converting to a plan. It will expose assumptions and gaps.
+Run `/grill-me` on your PRD before generating issues. It will expose remaining gaps.
 
 ---
 
 ## Phase 7: Planning
 
-### 7.1 Convert PRD to a tracer-bullet plan
+### 7.1 Generate issues from the PRD
 
 ```
-/prd-to-plan @prd/feature-name.md
+/to-issues @prd/feature-name.md
 ```
 
-Output: a `plans/feature-name.md` file.
+This creates a dependency graph of GitHub issues. Optionally draft a `plans/feature-name.md` file by hand to capture tracer-bullet sequencing before execution.
 
 ### 7.2 Tracer bullet rule
 
@@ -273,12 +287,12 @@ Phase 3: All tests  ← too late to discover integration issues
 
 ## Phase 8: GitHub Issues (Kanban)
 
-For larger features, break the plan into linked GitHub issues rather than executing phases sequentially.
+For larger features, break the PRD into linked GitHub issues rather than executing phases sequentially.
 
 ### 8.1 Generate issues from PRD
 
 ```
-/prd-to-issues @prd/feature-name.md
+/to-issues @prd/feature-name.md
 ```
 
 This creates a dependency graph:
