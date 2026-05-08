@@ -231,6 +231,14 @@ Auto-fix formatting: `nox -s format -- --fix`
 ### Planning artefacts
 - PRD files live in `prd/`
 - Implementation plans live in `plans/`
+
+### Daily workflow
+New feature?   → /grill-with-docs → /to-prd → /to-issues
+Start issue?   → /clear → @prd @plan "Do issue #N"
+Write logic?   → /tdd (red-green-refactor, one test at a time)
+Hard bug?      → /diagnose
+Validate?      → nox
+Architecture?  → /improve-codebase-architecture (run every few days)
 EOF
         print_success "Dev rails section appended to CLAUDE.md."
     fi
