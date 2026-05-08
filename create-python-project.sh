@@ -337,8 +337,9 @@ setup_github_remote() {
 
     echo ""
     local visibility=""
-    read -t 15 -p "Create GitHub repo '$project_name'? [y/N] " create_repo || true
-    if [[ ! "$create_repo" =~ ^[Yy]$ ]]; then
+    read -t 15 -p "Create GitHub repo '$project_name'? [Y/n] " create_repo || true
+    create_repo="${create_repo:-Y}"
+    if [[ "$create_repo" =~ ^[Nn]$ ]]; then
         print_info "Skipping GitHub remote setup."
         print_info "To set up later: gh repo create $project_name --public && git remote add origin <url> && git push -u origin master"
         return 0
