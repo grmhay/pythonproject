@@ -114,7 +114,9 @@ replace_content() {
                     gh_user=$(gh api user --jq .login 2>/dev/null || echo "")
                 fi
                 if [[ -n "$gh_user" ]]; then
-                    sed -i "s|github\.com/grmhay/|github.com/$gh_user/|g" "$file"
+                    sed -i "s|github\.com/grmhay/pythonproject|github.com/$gh_user/$new_name|g" "$file"
+                else
+                    sed -i "s|github\.com/grmhay/pythonproject|github.com/<your-username>/$new_name|g" "$file"
                 fi
             fi
             print_success "Updated: $file"
