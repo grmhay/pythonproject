@@ -355,6 +355,70 @@ EOF
     fi
 }
 
+# ── Docker Hub secrets ───────────────────────────────────────────────────────
+
+setup_docker_secrets() {
+    local project_name="$1"
+
+    if ! command -v gh &>/dev/null; then
+        print_warning "gh CLI not found — skipping Docker Hub secrets setup."
+        return 0
+    fi
+
+    if ! gh auth status &>/dev/null 2>&1; then
+        print_warning "gh CLI not authenticated — skipping Docker Hub secrets setup."
+        return 0
+    fi
+
+    local gh_user
+    gh_user=$(gh api user --jq .login 2>/dev/null || echo "")
+    if [[ -z "$gh_user" ]]; then
+        print_warning "Could not determine GitHub username — skipping Docker Hub secrets setup."
+        return 0
+    fi
+
+    if ! gh repo view "$gh_user/$project_name" &>/dev/null 2>&1; then
+        print_warning "Repo $gh_user/$project_name not found on GitHub — skipping Docker Hub secrets setup."
+        return 0
+    fi
+
+    echo ""
+    local setup_secrets=""
+    read -t 15 -p "Set Docker Hub secrets on $gh_user/$project_name? [Y/n] " setup_secrets || true
+    setup_secrets="${setup_secrets:-Y}"
+    if [[ "$setup_secrets" =~ ^[Nn]$ ]]; then
+        print_info "Skipping. Set them later with:"
+        print_info "  gh secret set DOCKERHUB_USERNAME --repo $gh_user/$project_name"
+        print_info "  gh secret set DOCKERHUB_TOKEN    --repo $gh_user/$project_name"
+        return 0
+    fi
+
+    local username="${DOCKERHUB_USERNAME:-}"
+    if [[ -z "$username" ]]; then
+        read -p "Docker Hub username: " username
+    else
+        print_info "Using DOCKERHUB_USERNAME from environment"
+    fi
+
+    local token="${DOCKERHUB_TOKEN:-}"
+    if [[ -z "$token" ]]; then
+        read -s -p "Docker Hub access token: " token
+        echo ""
+    else
+        print_info "Using DOCKERHUB_TOKEN from environment"
+    fi
+
+    if [[ -z "$username" ]] || [[ -z "$token" ]]; then
+        print_warning "Username or token was empty — skipping Docker Hub secrets setup."
+        return 0
+    fi
+
+    gh secret set DOCKERHUB_USERNAME --repo "$gh_user/$project_name" --body "$username" \
+        && print_success "Set DOCKERHUB_USERNAME on $gh_user/$project_name"
+    gh secret set DOCKERHUB_TOKEN --repo "$gh_user/$project_name" --body "$token" \
+        && print_success "Set DOCKERHUB_TOKEN on $gh_user/$project_name"
+}
+
 # ── Skills setup ─────────────────────────────────────────────────────────────
 
 install_skills() {
@@ -651,6 +715,7 @@ main() {
     install_skills
 
     init_git "$project_name" "$git_mode"
+    setup_docker_secrets "$project_name"
 
     print_info "Removing setup script"
     rm -f "create-python-project.sh"
