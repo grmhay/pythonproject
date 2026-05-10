@@ -108,6 +108,15 @@ replace_content() {
                 # The CLI entrypoint command uses hyphens (new_name), not underscores (python_name)
                 sed -i "s/ENTRYPOINT \[\"$python_name\"\]/ENTRYPOINT [\"$new_name\"]/" "$file"
             fi
+            if [[ "$file" == "CLAUDE.md" ]]; then
+                local gh_user=""
+                if command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+                    gh_user=$(gh api user --jq .login 2>/dev/null || echo "")
+                fi
+                if [[ -n "$gh_user" ]]; then
+                    sed -i "s|github\.com/grmhay/|github.com/$gh_user/|g" "$file"
+                fi
+            fi
             print_success "Updated: $file"
         fi
     done
