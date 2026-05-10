@@ -1,11 +1,13 @@
-FROM python:3.13-slim
+FROM node:22-bookworm
 
-RUN apt-get update && apt-get install -y curl git && rm -rf /var/lib/apt/lists/*
-
-# Node.js 22
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+  curl \
+  git \
+  jq \
+  python3 \
+  python3-pip \
+  python3-venv \
+  && rm -rf /var/lib/apt/lists/*
 
 # gh CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -17,10 +19,20 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
+# UID/GID alignment so bind-mounted files share ownership with the host user
+ARG AGENT_UID=1000
+ARG AGENT_GID=1000
+RUN groupmod -g $AGENT_GID node \
+    && usermod -u $AGENT_UID -g $AGENT_GID -d /home/agent -m -l agent node
+USER ${AGENT_UID}:${AGENT_GID}
+
 # Claude Code CLI
-RUN npm install -g @anthropic-ai/claude-code
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/home/agent/.local/bin:$PATH"
 
-# Python dev tools
-RUN pip install --no-cache-dir nox
+# Python dev tools (user install to stay in agent home)
+RUN pip install --user --no-cache-dir --break-system-packages nox
 
-WORKDIR /workspace
+WORKDIR /home/agent
+
+ENTRYPOINT ["sleep", "infinity"]
