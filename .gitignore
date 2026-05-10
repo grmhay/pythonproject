@@ -175,3 +175,7 @@ cython_debug/
 
 # Nix related:
 /result
+
+# Node.js
+node_modules/
+package-lock.json

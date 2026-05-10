@@ -84,6 +84,40 @@ nix run
 nix run . -- --name=there --count=3
 ```
 
+## Sandbox Loop
+
+The Sandbox Loop runs Claude Code against GitHub Issues labelled `ready-for-agent`, implements them inside an isolated Docker container, and opens a pull request per issue.
+
+### First-time setup
+
+Copy `.sandcastle/.env.example` to `.sandcastle/.env` and fill in your credentials:
+
+```sh
+cp .sandcastle/.env.example .sandcastle/.env
+```
+
+Build the sandbox Docker image (only needed once, or after editing `.sandcastle/Dockerfile`):
+
+```sh
+npx sandcastle docker build-image
+```
+
+### Running the loop
+
+1. Apply the `ready-for-agent` label to any fully-specified issue
+2. Run the loop:
+   ```sh
+   npm run sandcastle
+   ```
+3. The agent opens a PR per issue and moves the label from `ready-for-agent` to `ready-for-human`
+4. Review and merge the PR
+
+### Prerequisites
+
+- Docker running locally
+- `gh` CLI authenticated (`gh auth login`)
+- `ANTHROPIC_API_KEY` and `GITHUB_TOKEN` set in `.sandcastle/.env`
+
 ## Verifying a project setup
 
 After bootstrapping a project, you can verify it is fully configured by running:

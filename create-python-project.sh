@@ -270,6 +270,43 @@ EOF
                 ;;
         esac
 
+        cat >> "$readme_file" << 'EOF'
+
+## Sandbox Loop
+
+The Sandbox Loop runs Claude Code against GitHub Issues labelled `ready-for-agent`, implements them inside an isolated Docker container, and opens a pull request per issue.
+
+### First-time setup
+
+Copy `.sandcastle/.env.example` to `.sandcastle/.env` and fill in your credentials:
+
+```sh
+cp .sandcastle/.env.example .sandcastle/.env
+```
+
+Build the sandbox Docker image (only needed once, or after editing `.sandcastle/Dockerfile`):
+
+```sh
+npx sandcastle docker build-image
+```
+
+### Running the loop
+
+1. Apply the `ready-for-agent` label to any fully-specified issue
+2. Run the loop:
+   ```sh
+   npm run sandcastle
+   ```
+3. The agent opens a PR per issue and moves the label from `ready-for-agent` to `ready-for-human`
+4. Review and merge the PR
+
+### Prerequisites
+
+- Docker running locally
+- `gh` CLI authenticated (`gh auth login`)
+- `ANTHROPIC_API_KEY` and `GITHUB_TOKEN` set in `.sandcastle/.env`
+EOF
+
         print_success "Updated README.md"
     fi
 }
@@ -735,11 +772,13 @@ main() {
     print_success "Project '$project_name' configured successfully!"
     echo ""
     print_info "Next steps (run inside 'nix develop'):"
-    print_info "  1. cd ../$project_name    # if not already there"
-    print_info "  2. nix develop"
-    print_info "  3. nox                    # verify baseline passes"
-    print_info "  4. pre-commit install     # wire up the git hook"
-    print_info "  5. /setup-dev-rails       # in Claude Code — runs /setup-matt-pocock-skills, customises CLAUDE.md"
+    print_info "  1. cd ../$project_name          # if not already there"
+    print_info "  2. nix develop                  # also runs npm install --silent"
+    print_info "  3. nox                          # verify baseline passes"
+    print_info "  4. pre-commit install           # wire up the git hook"
+    print_info "  5. /setup-dev-rails             # in Claude Code — runs /setup-matt-pocock-skills, customises CLAUDE.md"
+    print_info "  6. cp .sandcastle/.env.example .sandcastle/.env  # fill in ANTHROPIC_API_KEY + GITHUB_TOKEN"
+    print_info "  7. npx sandcastle docker build-image             # build sandbox image (once)"
     echo ""
     print_info "Machine-level Claude skills: https://github.com/grmhay/claudesetup"
 }
