@@ -31,7 +31,15 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 ENV PATH="/home/agent/.local/bin:$PATH"
 
 # Python dev tools (user install to stay in agent home)
-RUN pip install --user --no-cache-dir --break-system-packages nox
+# All nox sessions use python=False and call tools as external processes,
+# so mypy/pytest/ruff must be on PATH — not just available to nox venvs.
+RUN pip install --user --no-cache-dir --break-system-packages \
+    mypy nox pytest ruff
+
+# taplo has no pip package — install the pre-built binary
+RUN curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-linux-x86_64.gz \
+    | gunzip > /home/agent/.local/bin/taplo \
+    && chmod +x /home/agent/.local/bin/taplo
 
 WORKDIR /home/agent
 
