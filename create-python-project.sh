@@ -81,6 +81,7 @@ replace_content() {
         "noxfile.py"
         "CLAUDE.md"
         "Dockerfile"
+        "package.json"
         "$python_name/__init__.py"
         "$python_name/cli.py"
         "$python_name/api.py"

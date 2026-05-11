@@ -31,6 +31,10 @@ Run `nox` and iterate until all sessions pass:
 nox
 ```
 
+> **Sandbox note**: this environment does not have Nix. Ignore the `nix develop`
+> instruction in `CLAUDE.md` — all tools (`taplo`, `ruff`, `mypy`, `pytest`)
+> are pre-installed and on PATH. Run `nox` directly.
+
 Do not commit until `nox` passes cleanly.
 
 ## Finish
