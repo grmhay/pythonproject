@@ -14,7 +14,29 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git add *)",
-      "Bash(git commit*)"
+      "Bash(git commit*)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git ls-tree *)",
+      "Bash(gh issue *)",
+      "Bash(gh label *)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)",
+      "Bash(gh repo *)",
+      "Bash(curl *)",
+      "Bash(npm run *)",
+      "Bash(./node_modules/.bin/sandcastle docker *)",
+      "Bash(npx sandcastle *)",
+      "Bash(nix develop *)",
+      "Bash(nix-instantiate *)",
+      "Bash(docker buildx imagetools *)",
+      "Bash(docker login *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(m.upper\\(\\), p\\) for p,ops in d['paths'].items\\(\\) for m in ops]\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(m.upper\\(\\), p\\) for p,ops in d['paths'].items\\(\\) for m in ops if m != 'options']\")",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }
