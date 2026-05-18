@@ -3,7 +3,7 @@
 import importlib.resources
 from pathlib import Path
 
-PACKAGE_NAME = "zamazingo.resources"
+PACKAGE_NAME = "vm_service.resources"
 
 
 def read_help_text() -> str:
