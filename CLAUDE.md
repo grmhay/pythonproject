@@ -15,8 +15,13 @@
 Run before committing: `nox`
 Or by session: `nox -s mypy`, `nox -s pytest`, `nox -s check`
 
+## Project conventions
+- vm-service manages the lifecycle of Proxmox-based virtual machines
+- VM IDs are always integers and globally unique
+- Use the Proxmox API exclusively — never the Proxmox CLI
+
 ## Out of scope (do not build)
-- [list anything explicitly excluded from this project]
+- Nothing explicitly excluded
 
 ## Agent skills
 

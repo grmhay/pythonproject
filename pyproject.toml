@@ -71,6 +71,7 @@ addopts = ["--doctest-modules"]
 
 testpaths = ["tests", "vm_service"]
 
+
 ########################
 ## RUFF CONFIGURATION ##
 ########################
