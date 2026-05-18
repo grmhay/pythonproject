@@ -1,13 +1,13 @@
 [project]
-name = "zamazingo"
+name = "vm-service"
 version = "0.0.0"
-description = "Yet Another Python CLI Application"
+description = "Yet Another Python Application"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "Hebele Hubele", email = "hebele@hubele.com" }]
 maintainers = [{ name = "Hebele Hubele", email = "hebele@hubele.com" }]
-keywords = ["cli"]
+keywords = ["cli", "api"]
 classifiers = [
   "Development Status :: 1 - Planning",
   "Environment :: Console",
@@ -33,9 +33,10 @@ test = ["mypy", "nox", "pytest", "anyio[trio]", "ruff"]
 
 [project.scripts]
 
-zamazingo = "zamazingo.cli:main"
-zamazingo-api = "zamazingo.api:run"
-zamazingo-mcp = "zamazingo.mcp_server:run"
+vm_service = "vm_service.cli:main"
+vm-service-api = "vm_service.api:run"
+vm_service-api = "vm_service.api:run"
+vm_service-mcp = "vm_service.mcp_server:run"
 
 ################################
 ## BUILD SYSTEM CONFIGURATION ##
@@ -53,12 +54,12 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 
 where = ["."]
-include = ["zamazingo*"]
+include = ["vm_service*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 
-zamazingo = ["resources/*"]
+vm_service = ["resources/*"]
 
 ##########################
 ## PYTEST CONFIGURATION ##
@@ -68,7 +69,8 @@ zamazingo = ["resources/*"]
 
 addopts = ["--doctest-modules"]
 
-testpaths = ["tests", "zamazingo"]
+testpaths = ["tests", "vm_service"]
+
 
 ########################
 ## RUFF CONFIGURATION ##

@@ -2,9 +2,9 @@
 
 from fastmcp import FastMCP
 
-from zamazingo import __version__
+from vm_service import __version__
 
-mcp = FastMCP("zamazingo")
+mcp = FastMCP("vm-service")
 
 
 @mcp.tool

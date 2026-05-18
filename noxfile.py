@@ -20,7 +20,7 @@ import nox
 paths = [
     "noxfile.py",
     "tests",
-    "zamazingo",
+    "vm_service",
 ]
 
 

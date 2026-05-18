@@ -5,8 +5,8 @@
 import pytest
 from fastmcp import Client
 
-from zamazingo import __version__
-from zamazingo.mcp_server import mcp
+from vm_service import __version__
+from vm_service.mcp_server import mcp
 
 
 @pytest.mark.anyio

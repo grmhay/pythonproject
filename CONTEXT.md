@@ -1,36 +1,40 @@
-# zamazingo
+# vm-service
 
-A Python project template that scaffolds CLI and API projects with built-in tooling for human-agent collaboration on GitHub Issues.
+A service that lifecycle-manages Proxmox-based virtual machines.
 
 ## Language
 
-**Sandbox Loop**:
-The automated workflow that picks issues labelled `ready-for-agent`, implements them inside a Docker sandbox via Claude Code, and opens a pull request per issue.
-_Avoid_: agent loop, CI loop, automation pipeline
+**VM**:
+A QEMU-based virtual machine managed by Proxmox. Does not include LXC containers.
+_Avoid_: container, instance, node
 
-**Agent Gate**:
-The `ready-for-agent` label — the human signal that an issue is fully specified and safe for the Sandbox Loop to attempt.
-_Avoid_: AFK-ready, auto-ready, agent-approved
+**Lifecycle**:
+The transitions vm-service owns: create → start → stop → destroy, plus resize (triggered by a NetBox update webhook when vcpus or memory changes). Pause, suspend, snapshots, and status sync are out of scope.
+_Avoid_: provisioning, orchestration
 
-**Sandbox**:
-The isolated Docker container in which the agent executes. It has access to the repo via a git worktree but cannot affect the host filesystem directly.
-_Avoid_: container, environment, box
-
-**Scaffold**:
-The act of running `create-python-project.sh` to produce a new project from the template. A Scaffolded project inherits all template conventions including the Sandbox Loop.
-_Avoid_: bootstrap, initialise, generate
+**Caller**:
+Any system that triggers a lifecycle transition. Primary caller is NetBox via webhook to the REST API. Secondary callers are agents via MCP and humans via CLI.
 
 ## Relationships
 
-- The **Sandbox Loop** picks issues that carry the **Agent Gate** label
-- Each **Sandbox Loop** run executes inside a **Sandbox** and produces one pull request per issue
-- A **Scaffold** produces a new project that ships with a pre-configured **Sandbox Loop**
-
-## Example dialogue
-
-> **Dev:** "Should I put this issue straight into the Sandbox Loop?"
-> **Domain expert:** "Not yet — it needs the Agent Gate label first. Triage it, make sure it's fully specified, then apply `ready-for-agent`."
+- **NetBox** drives lifecycle transitions via webhook: `planned` → create, `active` → start, `offline` → stop, `decommissioning` → destroy
+- **MCP** and **CLI** are secondary interfaces for agent and human callers respectively
+- **NetBox** is the source of truth for VM configuration (vcpus, memory, disk, custom fields), target Proxmox node, VMID, and Proxmox template name; vm-service reads all of these from the webhook payload
+- **Create** means: clone a Proxmox template, apply cloud-init configuration, result is a stopped VM ready to start
+- **Cloud-init config** comes entirely from NetBox: hostname from VM name, network from IP address assignments, SSH keys from custom field or config context
 
 ## Flagged ambiguities
 
-- "environment" was used to mean both the Nix dev shell and the Docker Sandbox — resolved: Sandbox refers only to the Docker container; the Nix shell is just "the dev shell".
+- **Proxmox auth**: API token (`user@realm!tokenid=secret`) — not username/password ticket flow
+- **Webhook auth**: HMAC-SHA512 verification via NetBox `X-Hook-Signature` header — not network-level trust
+- **Failure handling**: retry N times, then write failure status back to NetBox — no silent failures
+- **Operation execution**: async — webhook returns HTTP 202 immediately; vm-service polls Proxmox task status, then writes result back to NetBox
+- **Networking**: all VMs land on VLAN 20; the Proxmox template carries the NIC/bridge config — vm-service does not configure networking
+- **Idempotency**: all operations check current Proxmox state before acting; already-in-target-state is treated as success
+- **Proxmox deployment**: single cluster; URL and API token are config/env vars at startup
+- **DHCP**: managed by `dhcp-service` (HTTP API on skynet host) backed by Kea/ISC DHCP
+- **DNS**: managed by `dns-service` (HTTP API on skynet host) backed by BIND for internal networks
+- **DNS/DHCP lifecycle**: create registers both a DHCP reservation and DNS entry; destroy removes both; start/stop/resize do not touch DNS or DHCP
+- **DNS/DHCP data**: IP from NetBox IP assignment, hostname from NetBox VM name, MAC read from Proxmox after template clone
+- **Create ordering**: clone template → read MAC → register DHCP reservation → register DNS entry → start VM
+- **Destroy ordering**: stop VM → remove DHCP reservation → remove DNS entry → delete VM from Proxmox

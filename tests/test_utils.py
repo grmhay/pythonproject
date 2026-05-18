@@ -2,7 +2,7 @@
 
 # ruff: noqa: S101,PLR2004
 
-from zamazingo.utils import safe_divide
+from vm_service.utils import safe_divide
 
 
 def test_safe_divide() -> None:
