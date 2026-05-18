@@ -25,7 +25,7 @@ dependencies = ["click", "fastapi", "fastmcp", "uvicorn"]
 
 [project.optional-dependencies]
 
-test = ["mypy", "nox", "pytest", "pytest-anyio", "ruff"]
+test = ["mypy", "nox", "pytest", "anyio[trio]", "ruff"]
 
 #####################
 ## PROJECT SCRIPTS ##
