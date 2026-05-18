@@ -21,11 +21,11 @@ classifiers = [
   "Typing :: Typed",
 ]
 
-dependencies = ["click"]
+dependencies = ["click", "fastapi", "fastmcp", "uvicorn"]
 
 [project.optional-dependencies]
 
-test = ["mypy", "nox", "pytest", "ruff"]
+test = ["mypy", "nox", "pytest", "pytest-anyio", "ruff"]
 
 #####################
 ## PROJECT SCRIPTS ##
@@ -34,6 +34,8 @@ test = ["mypy", "nox", "pytest", "ruff"]
 [project.scripts]
 
 zamazingo = "zamazingo.cli:main"
+zamazingo-api = "zamazingo.api:run"
+zamazingo-mcp = "zamazingo.mcp_server:run"
 
 ################################
 ## BUILD SYSTEM CONFIGURATION ##

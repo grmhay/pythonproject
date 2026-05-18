@@ -18,6 +18,15 @@
         ## Get project specification:
         project = pyproject.project;
 
+        ## Strip version specifiers and extras from a PEP 508 dependency name:
+        depName = dep: builtins.head (builtins.split "[>=<;![ \t]" dep);
+
+        ## Resolve runtime Python dependencies from pyproject.toml:
+        pythonDeps = map (dep: pkgs.python3Packages.${depName dep}) project.dependencies;
+
+        ## Resolve test Python dependencies from pyproject.toml:
+        testDeps = map (dep: pkgs.python3Packages.${depName dep}) project."optional-dependencies".test;
+
         ## Get the package:
         package = pkgs.python3Packages.buildPythonPackage {
           ## Set the package name:
@@ -37,15 +46,8 @@
             setuptools
           ];
 
-          ## Specify test dependencies:
-          nativeCheckInputs = [
-            ## Python dependencies:
-            pkgs.python3Packages.mypy
-            pkgs.python3Packages.nox
-            pkgs.python3Packages.pytest
-            pkgs.python3Packages.ruff
-
-            ## Non-Python dependencies:
+          ## Specify test dependencies (Python deps from pyproject.toml + non-Python tools):
+          nativeCheckInputs = testDeps ++ [
             pkgs.taplo
           ];
 
@@ -56,10 +58,8 @@
             runHook postCheck
           '';
 
-          ## Specify production dependencies:
-          propagatedBuildInputs = [
-            pkgs.python3Packages.click
-          ];
+          ## Specify production dependencies from pyproject.toml:
+          propagatedBuildInputs = pythonDeps;
         };
 
         ## Make our package editable:
