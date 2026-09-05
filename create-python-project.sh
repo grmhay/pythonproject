@@ -152,7 +152,7 @@ patch_for_type() {
     case "$project_type" in
         api)
             sed -i 's/dependencies = \["click"\]/dependencies = ["fastapi", "uvicorn[standard]"]/' pyproject.toml
-            sed -i 's/test = \["mypy", "nox", "pytest", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "ruff"]/' pyproject.toml
+            sed -i 's/test = \["mypy", "nox", "pytest", "anyio", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "anyio", "ruff"]/' pyproject.toml
             sed -i "s/${python_name} = \"${python_name}\.cli:main\"/${python_name} = \"${python_name}.api:run\"/" pyproject.toml
             sed -i 's/Yet Another Python CLI Application/Yet Another Python API/' pyproject.toml
             sed -i 's/keywords = \["cli"\]/keywords = ["api"]/' pyproject.toml
@@ -164,7 +164,7 @@ patch_for_type() {
             ;;
         both)
             sed -i 's/dependencies = \["click"\]/dependencies = ["click", "fastapi", "uvicorn[standard]"]/' pyproject.toml
-            sed -i 's/test = \["mypy", "nox", "pytest", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "ruff"]/' pyproject.toml
+            sed -i 's/test = \["mypy", "nox", "pytest", "anyio", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "anyio", "ruff"]/' pyproject.toml
             sed -i "/${python_name} = \"${python_name}\.cli:main\"/a ${new_name}-api = \"${python_name}.api:run\"" pyproject.toml
             sed -i 's/Yet Another Python CLI Application/Yet Another Python Application/' pyproject.toml
             sed -i 's/keywords = \["cli"\]/keywords = ["cli", "api"]/' pyproject.toml
