@@ -83,10 +83,12 @@ plugins = ["pydantic.mypy"]
 ## the rails (see the `rails` nox session).
 strict = true
 
-## PyYAML ships no stubs and nixpkgs has no types-PyYAML. Scoping the
-## exemption to the one module keeps strict honest everywhere else, and
-## spares every project generated from this template from carrying stubs it
-## does not otherwise need.
+## PyYAML ships no inline stubs. nixpkgs does package types-PyYAML, but the
+## name maps to an attribute the flake's depName helper cannot resolve from a
+## PEP 508 string, so it would have to be hand-added to nativeCheckInputs.
+## yaml is read in exactly one place, behind an isinstance check, so scoping
+## the exemption to that module is the cheaper trade and keeps strict honest
+## everywhere else.
 [[tool.mypy.overrides]]
 
 module = ["yaml"]
