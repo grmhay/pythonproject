@@ -27,17 +27,13 @@
         ## Resolve test Python dependencies from pyproject.toml:
         testDeps = map (dep: pkgs.python3Packages.${depName dep}) project."optional-dependencies".test;
 
-        ## The canonical dev-rails checker, exposed as a package so downstream
-        ## projects can consume it as a flake input and pin it in flake.lock.
-        ## Both rails/ files are copied into the store together: check_rails.py
-        ## reads rails-spec.toml from its own directory.
-        railsChecker = pkgs.writeShellApplication {
-          name = "check-rails";
-          runtimeInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ];
-          text = ''
-            exec python3 ${./rails}/check_rails.py "$@"
-          '';
-        };
+        ## The canonical dev-rails checker. This repo is its source, so it is
+        ## built from ./rails here. create-python-project.sh rewrites the single
+        ## line below so a generated project takes the same derivation from the
+        ## pythonproject flake input instead -- one definition of the rails,
+        ## pinned per project in flake.lock.
+        ## RAILS-CHECKER (create-python-project.sh rewrites the next line)
+        railsChecker = import ./rails/checker.nix { inherit pkgs; };
 
         ## Get the package:
         package = pkgs.python3Packages.buildPythonPackage {

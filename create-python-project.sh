@@ -328,6 +328,33 @@ EOF
 setup_dev_rails() {
     print_info "Setting up dev rails..."
 
+    # Point the rails checker at the pythonproject flake input rather than
+    # vendoring a copy. A vendored rails/ would drift the moment anyone edited
+    # it, which is the exact failure the checker exists to catch -- so the
+    # generated project consumes the derivation from upstream and pins it in
+    # flake.lock instead.
+    if grep -q "RAILS-CHECKER" flake.nix; then
+        sed -i 's|^\( *\)railsChecker = import ./rails/checker.nix { inherit pkgs; };|\1railsChecker = pythonproject.packages.${system}.check-rails;|' flake.nix
+        sed -i '/## RAILS-CHECKER/d' flake.nix
+        # Declare the input and thread it through the outputs function.
+        sed -i 's|^\( *\)flake-utils.url = "github:numtide/flake-utils";|\1flake-utils.url = "github:numtide/flake-utils";\n\1pythonproject.url = "github:grmhay/pythonproject";|' flake.nix
+        sed -i 's|outputs = { self, nixpkgs, flake-utils, ... }:|outputs = { self, nixpkgs, flake-utils, pythonproject, ... }:|' flake.nix
+        rm -rf rails
+        # rails/ only exists in the template, where it is the checker's source
+        # and is linted like any other code. A generated project has no copy,
+        # so drop it from the noxfile's paths.
+        sed -i '/^    "rails",$/d' noxfile.py
+        # The yaml override and the T20 exemption both exist only for the
+        # checker's own source; a generated project has neither. Remove each
+        # block whole, comments included, rather than leaving an orphaned
+        # heading behind.
+        sed -i '/^## PyYAML ships no inline stubs\./,/^ignore_missing_imports = true$/d' pyproject.toml
+        sed -i '/^\[tool.ruff.lint.per-file-ignores\]$/,/^\[tool.ruff.lint.pydocstyle\]$/{/^\[tool.ruff.lint.pydocstyle\]$/!d}' pyproject.toml
+        print_success "Rails checker sourced from the pythonproject flake input."
+    else
+        print_warning "Could not find the RAILS-CHECKER marker in flake.nix — wire the rails checker manually."
+    fi
+
     # Add pre-commit to flake.nix dev shell
     if grep -q "pre-commit" flake.nix; then
         print_warning "pre-commit already present in flake.nix — skipping."
