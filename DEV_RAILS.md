@@ -202,7 +202,8 @@ Skills come from two places:
 
 | Skill | Description |
 |-------|-------------|
-| `/setup-dev-rails` | Finish wiring up dev rails interactively in Claude Code |
+| `/setup-dev-rails` | Finish wiring up dev rails interactively in Claude Code (new projects) |
+| `/harden-dev-rails` | Bring an existing project onto the current rails (drifted or pre-rails) |
 | `/omarchy` | Customise the Omarchy Linux desktop |
 
 **Project-level** — installed into `.claude/skills/` per project by `create-python-project.sh` via `npx skills@latest add mattpocock/skills`:
