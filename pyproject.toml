@@ -83,6 +83,16 @@ plugins = ["pydantic.mypy"]
 ## the rails (see the `rails` nox session).
 strict = true
 
+## PyYAML ships no stubs and nixpkgs has no types-PyYAML. Scoping the
+## exemption to the one module keeps strict honest everywhere else, and
+## spares every project generated from this template from carrying stubs it
+## does not otherwise need.
+[[tool.mypy.overrides]]
+
+module = ["yaml"]
+
+ignore_missing_imports = true
+
 ########################
 ## RUFF CONFIGURATION ##
 ########################
@@ -201,6 +211,11 @@ select = [
 
 ## Ignore specific rules or categories:
 ignore = ["COM812"]
+
+[tool.ruff.lint.per-file-ignores]
+
+## The rails checker is a CLI; stdout is its interface.
+"rails/*.py" = ["T20"]
 
 [tool.ruff.lint.pydocstyle]
 

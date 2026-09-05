@@ -1,0 +1,109 @@
+# Canonical dev-rails invariants.
+#
+# This file is the single definition of what "on the rails" means. Both ways of
+# running the checker read it, so `nox -s rails` and the rails-check reusable
+# workflow can differ in version but never in rules.
+#
+# Each entry below exists because a real project drifted on it.
+
+[mypy]
+## Every rails project claims "annotate every function -- mypy strict is
+## enforced". Nothing enforced it: of four services generated from this
+## template, two had no [tool.mypy] section at all and two had one without
+## strict.
+strict = true
+
+[ruff]
+## The full rule list. One service had silently narrowed this to 11 groups,
+## losing ANN (the rule that actually enforces the annotation convention),
+## D/DOC, S, TRY and the whole PL* family, while still claiming to follow the
+## rails. Projects may select MORE than this, never fewer.
+select = [
+  "AIR",
+  "ERA",
+  "FAST",
+  "YTT",
+  "ANN",
+  "ASYNC",
+  "S",
+  "BLE",
+  "FBT",
+  "B",
+  "A",
+  "COM",
+  "C4",
+  "CPY",
+  "DTZ",
+  "T10",
+  "DJ",
+  "EM",
+  "EXE",
+  "FIX",
+  "FA",
+  "INT",
+  "ISC",
+  "ICN",
+  "LOG",
+  "G",
+  "INP",
+  "PIE",
+  "T20",
+  "PYI",
+  "PT",
+  "Q",
+  "RSE",
+  "RET",
+  "SLF",
+  "SIM",
+  "SLOT",
+  "TID",
+  "TD",
+  "TC",
+  "ARG",
+  "PTH",
+  "FLY",
+  "I",
+  "C90",
+  "NPY",
+  "PD",
+  "N",
+  "PERF",
+  "E",
+  "W",
+  "DOC",
+  "D",
+  "F",
+  "PGH",
+  "PLC",
+  "PLE",
+  "PLR",
+  "PLW",
+  "UP",
+  "FURB",
+  "RUF",
+  "TRY",
+]
+
+[nox]
+## The gate. `rails` is deliberately not required here: a project that has not
+## adopted the checker yet is behind, not broken.
+sessions = ["taplo", "format", "check", "mypy", "pytest"]
+
+[ci]
+## A gate that does not block publishing is decoration. Two services ran no nox
+## in CI at all, leaving the pre-commit hook -- bypassable with --no-verify --
+## as the only enforcement.
+require_gate = true
+require_publish_needs_gate = true
+
+[flake]
+## setuptools-scm is a build dependency, not a runtime one. One service declared
+## dynamic = ["version"] but never added it to the flake's build-system, so
+## `nix build` failed before it ever reached checkPhase.
+require_setuptools_scm_when_dynamic_version = true
+
+[tests]
+## "Every module must have a corresponding test file in tests/" -- claimed by
+## CLAUDE.md in every rails project, checked by nothing until now.
+require_test_per_module = true
+ignore_modules = ["__init__", "__main__", "py.typed"]

@@ -19,6 +19,7 @@ import nox
 #: Files and directories of interest.
 paths = [
     "noxfile.py",
+    "rails",
     "tests",
     "zamazingo",
 ]
