@@ -363,6 +363,31 @@ setup_dev_rails() {
             print_success "Added the rails-check job to CI."
         fi
 
+        # Add the deploy-PR job. Like rails-check, this lives here rather than
+        # in the template because pythonproject is public and the ops control
+        # plane is private -- and a public repo cannot call a private repo's
+        # reusable workflow, which fails the whole run, not just the job.
+        if [[ -f "$publish_workflow" ]] && ! grep -q "deploy-pr:" "$publish_workflow"; then
+            cat >> "$publish_workflow" << 'DEPLOYPR'
+
+  # Opens or updates the single deploy/<stack> PR in the ops control plane,
+  # bumping the pinned digest to this build. Merging that PR is the approval
+  # point; the reconciler rolls it out from there. Stays dormant until the
+  # image actually publishes, since digest is empty until then.
+  deploy-pr:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && needs.build-and-push.outputs.digest != ''
+    uses: grmhay/homelab-opscontrolplane/.github/workflows/deploy-pr.yml@master
+    with:
+      image: ${{ needs.build-and-push.outputs.image }}
+      digest: ${{ needs.build-and-push.outputs.digest }}
+      source-sha: ${{ github.sha }}
+    secrets:
+      token: ${{ secrets.OPS_DEPLOY_PAT }}
+DEPLOYPR
+            print_success "Added the deploy-PR job to CI."
+        fi
+
         print_success "Rails checker sourced from the pythonproject flake input."
     else
         print_warning "Could not find the RAILS-CHECKER marker in flake.nix — wire the rails checker manually."
