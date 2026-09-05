@@ -374,7 +374,7 @@ EOF
 
 ### Environment
 - Always work inside `nix develop`; never use pip or venv directly
-- Run `nox` to validate all five sessions: taplo → format → check → mypy → pytest
+- Run `nox` to validate all six sessions: taplo → format → check → rails → mypy → pytest
 
 ### Code conventions
 - Every module must have a corresponding test file in `tests/`

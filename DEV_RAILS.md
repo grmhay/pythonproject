@@ -76,14 +76,15 @@ This drops you into a shell with Python, mypy, nox, ruff, taplo, ipython, and th
 nox
 ```
 
-All five sessions should pass on a fresh clone before you touch anything:
+All six sessions should pass on a fresh clone before you touch anything:
 
 | Session   | What it checks                          |
 |-----------|-----------------------------------------|
 | `taplo`   | TOML formatting                         |
 | `format`  | ruff formatting + import order          |
-| `check`   | ruff lint (85+ rules)                   |
-| `mypy`    | type correctness                        |
+| `check`   | ruff lint (63 rule groups)              |
+| `rails`   | the project still matches these rails   |
+| `mypy`    | type correctness (strict)               |
 | `pytest`  | unit tests + doctests                   |
 
 ---
@@ -348,7 +349,7 @@ Create a dedicated QA issue with a manual checklist:
 
 ```markdown
 ## QA Checklist
-- [ ] `nox` passes (all five sessions)
+- [ ] `nox` passes (all six sessions)
 - [ ] CLI happy path works end-to-end
 - [ ] Error cases show correct messages
 - [ ] Behaviour matches PRD user stories
@@ -424,9 +425,45 @@ nox -s taplo           # check TOML formatting
 nox -s format          # check ruff format + import order
 nox -s format -- --fix # auto-fix formatting
 nox -s check           # lint with ruff
+nox -s rails           # check the project has not drifted off the rails
 nox -s mypy            # type check
 nox -s pytest          # unit tests + doctests
 ```
+
+---
+
+## Phase 2b: The gate in CI, and the deploy PR
+
+The pre-commit hook is bypassable with `--no-verify`, and it does not exist at
+all on a machine where nobody ran `pre-commit install`. So the gate also runs in
+CI, in `.github/workflows/docker-publish.yml`:
+
+| Job            | What it does                                                        |
+|----------------|---------------------------------------------------------------------|
+| `quality`      | `nix build '.#default' -L` — runs every nox session via `checkPhase`, with the tool versions pinned in `flake.lock` |
+| `rails-check`  | runs the canonical checker from `pythonproject` — independent of this repo's own noxfile |
+| `build-and-push` | builds and pushes the image; **needs both gates**                 |
+| `deploy-pr`    | opens/updates the `deploy/<stack>` PR in the ops control plane      |
+
+Two properties worth keeping:
+
+- **The publish depends on the gate.** A gate that runs alongside the publish
+  rather than before it cannot stop a bad image shipping. Two services in this
+  fleet ran nox in CI while publishing from a job that did not depend on it.
+- **`quality` uses the flake**, so CI and `nix develop` cannot drift apart. If a
+  package's dynamic `setuptools-scm` version cannot resolve in the sandbox, use
+  `nix develop --command nox` instead — the `rails` check accepts either.
+
+Merging the deploy PR is the approval point; the reconciler rolls it out from
+there. Nothing deploys straight from a green build.
+
+### Why a `rails` session at all
+
+`DEV_RAILS.md` has always described the rails correctly, and every project
+generated from this template carries a copy. Four services drifted anyway —
+prose is advisory, and nothing executed it. The `rails` session executes it:
+the invariants live as data in `rails/rails-spec.toml` and are checked on every
+commit and every build.
 
 ---
 
@@ -478,7 +515,7 @@ Build / run?
 **Per project:**
 - [ ] `create-python-project.sh` run; package renamed from `zamazingo`, dev rails wired up
 - [ ] `nix develop` works and drops into dev shell
-- [ ] `nox` passes all five sessions on the fresh template
+- [ ] `nox` passes all six sessions on the fresh template
 - [ ] `pre-commit install` run inside `nix develop`
 - [ ] Pre-commit fires on a test commit and blocks on failure
 - [ ] `CLAUDE.md` "Out of scope" section updated for this project (via `/setup-dev-rails`)

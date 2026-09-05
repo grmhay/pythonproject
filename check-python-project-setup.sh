@@ -37,11 +37,11 @@ else
   fail "flake.nix not found"
 fi
 
-# 3. nox passes all five sessions (only run if nox is on PATH)
+# 3. nox passes all sessions (only run if nox is on PATH)
 if command -v nox &>/dev/null; then
   echo "    Running nox (this may take a moment)..."
   if nox --nocolor &>/dev/null; then
-    ok "nox passes all five sessions"
+    ok "nox passes all sessions"
   else
     fail "nox: one or more sessions failed (run 'nox' for details)"
   fi
