@@ -1,4 +1,4 @@
-name: Build and publish OCI image
+name: CI/CD
 
 on:
   push:
@@ -11,10 +11,39 @@ on:
       - main
 
 jobs:
-  build-and-push:
+  quality:
+    name: Quality Gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      # Runs every nox session (taplo, format, check, mypy, pytest, rails) via
+      # the package's checkPhase, using the exact tool versions pinned in
+      # flake.lock. This keeps CI identical to local `nix develop` and stops the
+      # two drifting apart. `.#default` rather than `.#<name>` so it keeps
+      # working after create-python-project.sh renames the package.
+      - name: Quality gate (nox via nix flake)
+        run: nix build '.#default' -L
+
+  build-and-push:
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      # The manifest digest, handed to the deploy-PR job below so the control
+      # plane pins this exact build. Empty on pull_request builds and on the
+      # unrenamed template, neither of which push.
+      digest: ${{ steps.push.outputs.digest }}
+      # The image repository this build published to, so the deploy-PR job does
+      # not have to reconstruct it from a secret.
+      image: ${{ steps.image.outputs.value }}
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
@@ -26,6 +55,10 @@ jobs:
         id: project
         run: |
           echo "name=$(python3 -c "import tomllib; f=open('pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])")" >> $GITHUB_OUTPUT
+
+      - name: Compute image name
+        id: image
+        run: echo "value=${DOCKERHUB_USERNAME}/${{ steps.project.outputs.name }}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
         if: |
@@ -41,7 +74,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ steps.project.outputs.name }}
+          images: ${{ steps.image.outputs.value }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -52,6 +85,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -60,3 +94,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Opens or updates the single deploy/<stack> PR in the ops control plane,
+  # bumping the pinned digest to this build. Merging that PR is the approval
+  # point; the reconciler rolls it out from there. Skipped automatically until
+  # the image actually publishes, since digest is empty until then.
+  deploy-pr:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && needs.build-and-push.outputs.digest != ''
+    uses: grmhay/homelab-opscontrolplane/.github/workflows/deploy-pr.yml@master
+    with:
+      image: ${{ needs.build-and-push.outputs.image }}
+      digest: ${{ needs.build-and-push.outputs.digest }}
+      source-sha: ${{ github.sha }}
+    secrets:
+      token: ${{ secrets.OPS_DEPLOY_PAT }}
