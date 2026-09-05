@@ -350,6 +350,19 @@ setup_dev_rails() {
         # heading behind.
         sed -i '/^## PyYAML ships no inline stubs\./,/^ignore_missing_imports = true$/d' pyproject.toml
         sed -i '/^\[tool.ruff.lint.per-file-ignores\]$/,/^\[tool.ruff.lint.pydocstyle\]$/{/^\[tool.ruff.lint.pydocstyle\]$/!d}' pyproject.toml
+        # Add the independent rails check. It lives here rather than in the
+        # template's own workflow because pythonproject IS the checker's
+        # source: its `quality` job already runs the canonical checker from
+        # its own tree, and a self-reference to @main cannot resolve on a
+        # branch where the workflow does not yet exist -- which fails the
+        # whole run, not just that job.
+        local publish_workflow=".github/workflows/docker-publish.yml"
+        if [[ -f "$publish_workflow" ]] && ! grep -q "rails-check:" "$publish_workflow"; then
+            sed -i 's|^  build-and-push:$|  # Independent of this repo'"'"'s own noxfile: catches a project that\n  # dropped the rails session or narrowed its spec, which `quality` cannot see.\n  rails-check:\n    uses: grmhay/pythonproject/.github/workflows/rails-check.yml@main\n\n  build-and-push:|' "$publish_workflow"
+            sed -i 's|^    needs: quality$|    needs: [quality, rails-check]|' "$publish_workflow"
+            print_success "Added the rails-check job to CI."
+        fi
+
         print_success "Rails checker sourced from the pythonproject flake input."
     else
         print_warning "Could not find the RAILS-CHECKER marker in flake.nix — wire the rails checker manually."
