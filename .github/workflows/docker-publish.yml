@@ -31,8 +31,13 @@ jobs:
       - name: Quality gate (nox via nix flake)
         run: nix build '.#default' -L
 
+  # Independent of this repo's own noxfile: catches a project that dropped the
+  # rails session or narrowed its spec, which `quality` alone cannot see.
+  rails-check:
+    uses: grmhay/pythonproject/.github/workflows/rails-check.yml@main
+
   build-and-push:
-    needs: quality
+    needs: [quality, rails-check]
     runs-on: ubuntu-latest
     permissions:
       contents: read
