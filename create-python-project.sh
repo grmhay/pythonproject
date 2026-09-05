@@ -152,7 +152,7 @@ patch_for_type() {
     case "$project_type" in
         api)
             sed -i 's/dependencies = \["click"\]/dependencies = ["fastapi", "uvicorn[standard]"]/' pyproject.toml
-            sed -i 's/test = \["mypy", "nox", "pytest", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "ruff"]/' pyproject.toml
+            sed -i 's/test = \["mypy", "nox", "pytest", "anyio", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "anyio", "ruff"]/' pyproject.toml
             sed -i "s/${python_name} = \"${python_name}\.cli:main\"/${python_name} = \"${python_name}.api:run\"/" pyproject.toml
             sed -i 's/Yet Another Python CLI Application/Yet Another Python API/' pyproject.toml
             sed -i 's/keywords = \["cli"\]/keywords = ["api"]/' pyproject.toml
@@ -164,7 +164,7 @@ patch_for_type() {
             ;;
         both)
             sed -i 's/dependencies = \["click"\]/dependencies = ["click", "fastapi", "uvicorn[standard]"]/' pyproject.toml
-            sed -i 's/test = \["mypy", "nox", "pytest", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "ruff"]/' pyproject.toml
+            sed -i 's/test = \["mypy", "nox", "pytest", "anyio", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "anyio", "ruff"]/' pyproject.toml
             sed -i "/${python_name} = \"${python_name}\.cli:main\"/a ${new_name}-api = \"${python_name}.api:run\"" pyproject.toml
             sed -i 's/Yet Another Python CLI Application/Yet Another Python Application/' pyproject.toml
             sed -i 's/keywords = \["cli"\]/keywords = ["cli", "api"]/' pyproject.toml
@@ -328,6 +328,46 @@ EOF
 setup_dev_rails() {
     print_info "Setting up dev rails..."
 
+    # Point the rails checker at the pythonproject flake input rather than
+    # vendoring a copy. A vendored rails/ would drift the moment anyone edited
+    # it, which is the exact failure the checker exists to catch -- so the
+    # generated project consumes the derivation from upstream and pins it in
+    # flake.lock instead.
+    if grep -q "RAILS-CHECKER" flake.nix; then
+        sed -i 's|^\( *\)railsChecker = import ./rails/checker.nix { inherit pkgs; };|\1railsChecker = pythonproject.packages.${system}.check-rails;|' flake.nix
+        sed -i '/## RAILS-CHECKER/d' flake.nix
+        # Declare the input and thread it through the outputs function.
+        sed -i 's|^\( *\)flake-utils.url = "github:numtide/flake-utils";|\1flake-utils.url = "github:numtide/flake-utils";\n\1pythonproject.url = "github:grmhay/pythonproject";|' flake.nix
+        sed -i 's|outputs = { self, nixpkgs, flake-utils, ... }:|outputs = { self, nixpkgs, flake-utils, pythonproject, ... }:|' flake.nix
+        rm -rf rails
+        # rails/ only exists in the template, where it is the checker's source
+        # and is linted like any other code. A generated project has no copy,
+        # so drop it from the noxfile's paths.
+        sed -i '/^    "rails",$/d' noxfile.py
+        # The yaml override and the T20 exemption both exist only for the
+        # checker's own source; a generated project has neither. Remove each
+        # block whole, comments included, rather than leaving an orphaned
+        # heading behind.
+        sed -i '/^## PyYAML ships no inline stubs\./,/^ignore_missing_imports = true$/d' pyproject.toml
+        sed -i '/^\[tool.ruff.lint.per-file-ignores\]$/,/^\[tool.ruff.lint.pydocstyle\]$/{/^\[tool.ruff.lint.pydocstyle\]$/!d}' pyproject.toml
+        # Add the independent rails check. It lives here rather than in the
+        # template's own workflow because pythonproject IS the checker's
+        # source: its `quality` job already runs the canonical checker from
+        # its own tree, and a self-reference to @main cannot resolve on a
+        # branch where the workflow does not yet exist -- which fails the
+        # whole run, not just that job.
+        local publish_workflow=".github/workflows/docker-publish.yml"
+        if [[ -f "$publish_workflow" ]] && ! grep -q "rails-check:" "$publish_workflow"; then
+            sed -i 's|^  build-and-push:$|  # Independent of this repo'"'"'s own noxfile: catches a project that\n  # dropped the rails session or narrowed its spec, which `quality` cannot see.\n  rails-check:\n    uses: grmhay/pythonproject/.github/workflows/rails-check.yml@main\n\n  build-and-push:|' "$publish_workflow"
+            sed -i 's|^    needs: quality$|    needs: [quality, rails-check]|' "$publish_workflow"
+            print_success "Added the rails-check job to CI."
+        fi
+
+        print_success "Rails checker sourced from the pythonproject flake input."
+    else
+        print_warning "Could not find the RAILS-CHECKER marker in flake.nix — wire the rails checker manually."
+    fi
+
     # Add pre-commit to flake.nix dev shell
     if grep -q "pre-commit" flake.nix; then
         print_warning "pre-commit already present in flake.nix — skipping."
@@ -374,7 +414,7 @@ EOF
 
 ### Environment
 - Always work inside `nix develop`; never use pip or venv directly
-- Run `nox` to validate all five sessions: taplo → format → check → mypy → pytest
+- Run `nox` to validate all six sessions: taplo → format → check → rails → mypy → pytest
 
 ### Code conventions
 - Every module must have a corresponding test file in `tests/`

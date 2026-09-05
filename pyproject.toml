@@ -25,7 +25,7 @@ dependencies = ["click", "fastapi", "fastmcp", "uvicorn"]
 
 [project.optional-dependencies]
 
-test = ["mypy", "nox", "pytest", "anyio[trio]", "ruff"]
+test = ["mypy", "nox", "pytest", "anyio", "ruff"]
 
 #####################
 ## PROJECT SCRIPTS ##
@@ -69,6 +69,31 @@ zamazingo = ["resources/*"]
 addopts = ["--doctest-modules"]
 
 testpaths = ["tests", "zamazingo"]
+
+########################
+## MYPY CONFIGURATION ##
+########################
+
+[tool.mypy]
+
+plugins = ["pydantic.mypy"]
+
+## The dev rails require every function to be annotated; strict is what
+## actually enforces that. Keep it on -- a project that turns it off has left
+## the rails (see the `rails` nox session).
+strict = true
+
+## PyYAML ships no inline stubs. nixpkgs does package types-PyYAML, but the
+## name maps to an attribute the flake's depName helper cannot resolve from a
+## PEP 508 string, so it would have to be hand-added to nativeCheckInputs.
+## yaml is read in exactly one place, behind an isinstance check, so scoping
+## the exemption to that module is the cheaper trade and keeps strict honest
+## everywhere else.
+[[tool.mypy.overrides]]
+
+module = ["yaml"]
+
+ignore_missing_imports = true
 
 ########################
 ## RUFF CONFIGURATION ##
@@ -188,6 +213,11 @@ select = [
 
 ## Ignore specific rules or categories:
 ignore = ["COM812"]
+
+[tool.ruff.lint.per-file-ignores]
+
+## The rails checker is a CLI; stdout is its interface.
+"rails/*.py" = ["T20"]
 
 [tool.ruff.lint.pydocstyle]
 

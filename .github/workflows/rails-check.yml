@@ -1,0 +1,59 @@
+# Reusable dev-rails check.
+#
+# A project's own `nox -s rails` session is the fast path, but it cannot catch
+# the one failure that matters most: a repo that deleted the session, narrowed
+# its spec, or unpinned the flake input. This workflow runs the canonical
+# checker straight from pythonproject against the calling repo, so the verdict
+# does not depend on anything the calling repo can edit.
+#
+# It reads the same rails-spec.toml the local session does, so the two can
+# differ in version but never in rules.
+#
+# Caller example (in the service repo):
+#
+#   rails-check:
+#     uses: grmhay/pythonproject/.github/workflows/rails-check.yml@main
+#
+# Deliberately does not use nix: it must stay fast, and it must not depend on
+# the calling project's flake being buildable.
+
+name: rails-check
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "pythonproject ref providing the canonical rails definition."
+        required: false
+        type: string
+        default: "main"
+
+jobs:
+  rails:
+    name: Dev rails
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the calling project
+        uses: actions/checkout@v4
+        with:
+          path: project
+
+      - name: Checkout the canonical rails definition
+        uses: actions/checkout@v4
+        with:
+          repository: grmhay/pythonproject
+          ref: ${{ inputs.ref }}
+          path: rails-source
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install checker dependencies
+        run: pip install --quiet pyyaml
+
+      - name: Check the dev rails
+        run: python3 rails-source/rails/check_rails.py project

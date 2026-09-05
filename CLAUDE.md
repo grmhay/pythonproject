@@ -2,7 +2,7 @@
 
 ## Environment
 - Always work inside `nix develop`; never use pip or venv directly
-- Run `nox` to validate; all five sessions must pass before committing
+- Run `nox` to validate; all six sessions must pass before committing
 
 ## Code conventions
 - Every module in `zamazingo/` must have a corresponding test file in `tests/`

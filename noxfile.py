@@ -19,6 +19,7 @@ import nox
 #: Files and directories of interest.
 paths = [
     "noxfile.py",
+    "rails",
     "tests",
     "zamazingo",
 ]
@@ -66,6 +67,12 @@ def ruff_check(session: nox.Session) -> None:
 
     ## Run ruff:
     session.run("ruff", "check", *args, *paths, external=True)
+
+
+@nox.session(python=False)
+def rails(session: nox.Session) -> None:
+    """Check this project still matches the canonical dev rails."""
+    session.run("check-rails", ".", external=True)
 
 
 @nox.session(python=False)

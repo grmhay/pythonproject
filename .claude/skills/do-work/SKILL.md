@@ -17,7 +17,7 @@ If no plan exists, outline the approach in 3-5 bullet points before writing any 
 - **Type annotations**: Add to every function; run `nox -s mypy` to verify
 
 ### 4. Validate
-Run `nox`. Iterate until all five sessions pass.
+Run `nox`. Iterate until all six sessions pass.
 
 ### 5. Commit
 Write a meaningful commit message describing the why, not the what.
