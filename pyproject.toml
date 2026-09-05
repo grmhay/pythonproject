@@ -71,6 +71,19 @@ addopts = ["--doctest-modules"]
 testpaths = ["tests", "zamazingo"]
 
 ########################
+## MYPY CONFIGURATION ##
+########################
+
+[tool.mypy]
+
+plugins = ["pydantic.mypy"]
+
+## The dev rails require every function to be annotated; strict is what
+## actually enforces that. Keep it on -- a project that turns it off has left
+## the rails (see the `rails` nox session).
+strict = true
+
+########################
 ## RUFF CONFIGURATION ##
 ########################
 
