@@ -27,6 +27,18 @@
         ## Resolve test Python dependencies from pyproject.toml:
         testDeps = map (dep: pkgs.python3Packages.${depName dep}) project."optional-dependencies".test;
 
+        ## The canonical dev-rails checker, exposed as a package so downstream
+        ## projects can consume it as a flake input and pin it in flake.lock.
+        ## Both rails/ files are copied into the store together: check_rails.py
+        ## reads rails-spec.toml from its own directory.
+        railsChecker = pkgs.writeShellApplication {
+          name = "check-rails";
+          runtimeInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ];
+          text = ''
+            exec python3 ${./rails}/check_rails.py "$@"
+          '';
+        };
+
         ## Get the package:
         package = pkgs.python3Packages.buildPythonPackage {
           ## Set the package name:
@@ -49,6 +61,10 @@
           ## Specify test dependencies (Python deps from pyproject.toml + non-Python tools):
           nativeCheckInputs = testDeps ++ [
             pkgs.taplo
+
+            ## The `rails` session runs inside checkPhase too, so the checker
+            ## has to be here as well as in the dev shell.
+            railsChecker
           ];
 
           ## Define the check phase:
@@ -73,6 +89,7 @@
         ## Project packages output:
         packages = {
           "${project.name}" = package;
+          check-rails = railsChecker;
           default = self.packages.${system}.${project.name};
         };
 
@@ -96,6 +113,9 @@
 
               pkgs.python3Packages.build
               pkgs.python3Packages.ipython
+
+              ## Provides `check-rails` for the `rails` nox session:
+              railsChecker
 
               ####################
               # EDITOR/LSP TOOLS #

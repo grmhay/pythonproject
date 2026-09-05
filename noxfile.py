@@ -70,6 +70,12 @@ def ruff_check(session: nox.Session) -> None:
 
 
 @nox.session(python=False)
+def rails(session: nox.Session) -> None:
+    """Check this project still matches the canonical dev rails."""
+    session.run("check-rails", ".", external=True)
+
+
+@nox.session(python=False)
 def mypy(session: nox.Session) -> None:
     """Type-check on the codebase."""
     session.run("mypy", "--no-install-types", *paths, external=True)
