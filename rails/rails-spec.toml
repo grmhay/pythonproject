@@ -105,5 +105,12 @@ require_setuptools_scm_when_dynamic_version = true
 [tests]
 ## "Every module must have a corresponding test file in tests/" -- claimed by
 ## CLAUDE.md in every rails project, checked by nothing until now.
+##
+## ADVISORY ONLY. Coverage cannot be established from the source: a module
+## exercised through a TestClient, or covered by a test file that does not
+## share its name, is indistinguishable from one nobody tests. Matching on
+## filename alone produced four false positives in one repo. It reports, it
+## never fails the gate -- a gate that fails on an unreliable signal only
+## teaches people to bypass gates.
 require_test_per_module = true
 ignore_modules = ["__init__", "__main__", "py.typed"]

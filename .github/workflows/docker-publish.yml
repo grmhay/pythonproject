@@ -94,18 +94,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # Opens or updates the single deploy/<stack> PR in the ops control plane,
-  # bumping the pinned digest to this build. Merging that PR is the approval
-  # point; the reconciler rolls it out from there. Skipped automatically until
-  # the image actually publishes, since digest is empty until then.
-  deploy-pr:
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main' && needs.build-and-push.outputs.digest != ''
-    uses: grmhay/homelab-opscontrolplane/.github/workflows/deploy-pr.yml@master
-    with:
-      image: ${{ needs.build-and-push.outputs.image }}
-      digest: ${{ needs.build-and-push.outputs.digest }}
-      source-sha: ${{ github.sha }}
-    secrets:
-      token: ${{ secrets.OPS_DEPLOY_PAT }}

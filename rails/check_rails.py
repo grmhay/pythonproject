@@ -39,6 +39,7 @@ class Report:
     def __init__(self) -> None:
         """Start an empty report."""
         self.failures: list[str] = []
+        self.warnings: list[str] = []
         self.passes: int = 0
 
     def ok(self, message: str) -> None:
@@ -51,6 +52,12 @@ class Report:
         self.failures.append(message)
         print(f"[FAIL] {message}")
         print(f"       fix: {fix}")
+
+    def warn(self, message: str, fix: str) -> None:
+        """Record an advisory finding that does not fail the gate."""
+        self.warnings.append(message)
+        print(f"[WARN] {message}")
+        print(f"       {fix}")
 
     def skip(self, message: str) -> None:
         """Record an invariant that does not apply to this project."""
@@ -306,6 +313,14 @@ def _package_dir(project: Path) -> Path | None:
     return candidate if candidate.is_dir() else None
 
 
+def _module_referenced(module: Path, package: Path, corpus: str) -> bool:
+    """Report whether any test refers to this module, by dotted path or name."""
+    dotted = ".".join(
+        (package.name, *module.relative_to(package).with_suffix("").parts)
+    )
+    return dotted in corpus or f"import {module.stem}" in corpus
+
+
 def _check_tests(project: Path, spec: dict[str, Any], report: Report) -> None:
     """Every module should have a test file, as CLAUDE.md claims."""
     tests_spec = spec.get("tests", {})
@@ -317,19 +332,35 @@ def _check_tests(project: Path, spec: dict[str, Any], report: Report) -> None:
         return
     ignore = set(tests_spec.get("ignore_modules", []))
     tests_dir = project / "tests"
+    if not tests_dir.is_dir():
+        report.fail("no tests/ directory", "add one")
+        return
     existing = {path.name for path in tests_dir.rglob("test_*.py")}
+    # A module counts as covered if a conventionally-named test file exists OR
+    # any test refers to it. Matching on filename alone punishes reasonable
+    # names -- tests/test_records_api.py does cover api/records.py -- and
+    # proves nothing about coverage either way.
+    corpus = "\n".join(
+        path.read_text(encoding="utf-8", errors="ignore")
+        for path in tests_dir.rglob("*.py")
+    )
     missing = [
         module.relative_to(project).as_posix()
         for module in sorted(package.rglob("*.py"))
-        if module.stem not in ignore and f"test_{module.stem}.py" not in existing
+        if module.stem not in ignore
+        and f"test_{module.stem}.py" not in existing
+        and not _module_referenced(module, package, corpus)
     ]
     if missing:
-        report.fail(
-            f"{len(missing)} module(s) have no test file: {', '.join(missing)}",
-            "add tests/test_<module>.py for each",
+        report.warn(
+            f"{len(missing)} module(s) have no obvious test coverage: "
+            f"{', '.join(missing)}",
+            "advisory only -- a module exercised indirectly (through a "
+            "TestClient, say) cannot be detected from the source, so this "
+            "never fails the gate",
         )
     else:
-        report.ok("every module has a corresponding test file")
+        report.ok("every module has apparent test coverage")
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -373,10 +404,11 @@ def main(argv: list[str] | None = None) -> int:
     _check_tests(project, spec, report)
     print("─" * 60)
 
+    warned = f", {len(report.warnings)} advisory" if report.warnings else ""
     if report.failures:
-        print(f"{report.passes} passed, {len(report.failures)} failed")
+        print(f"{report.passes} passed, {len(report.failures)} failed{warned}")
         return _FAILURE_EXIT
-    print(f"{report.passes} passed — on the rails")
+    print(f"{report.passes} passed{warned} — on the rails")
     return 0
 
 
