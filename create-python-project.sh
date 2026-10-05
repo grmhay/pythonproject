@@ -564,6 +564,19 @@ validate_git_url() {
     fi
 }
 
+# Credentials embedded in a remote URL (https://user:token@host/...) end up in
+# .git/config in plain text and get echoed to the terminal. Strip them; git
+# should get credentials from a helper (e.g. `gh auth setup-git`) instead.
+strip_remote_credentials() {
+    local url
+    url=$(git remote get-url origin 2>/dev/null) || return 0
+    if [[ "$url" =~ ^(https?://)[^/@]+@(.*)$ ]]; then
+        git remote set-url origin "${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
+        print_warning "Removed embedded credentials from the origin remote URL."
+        print_info "Use a credential helper instead, e.g. 'gh auth setup-git'."
+    fi
+}
+
 display_git_options() {
     echo ""
     print_info "Git repository configuration options:"
@@ -672,6 +685,8 @@ init_git() {
         setup_github_remote "$project_name"
         return 0
     fi
+
+    strip_remote_credentials
 
     # Non-interactive mode (Issue #3)
     if [[ -n "$git_mode" ]]; then
