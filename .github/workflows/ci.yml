@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      # Runs every nox session via the package's checkPhase. The pytest
+      # session renders each project type from template/ and runs the rails
+      # checker on it, so a template change that breaks generated projects
+      # fails here rather than in a service's `copier update` PR.
+      - name: Quality gate (nox via nix flake)
+        run: nix build '.#default' -L
+
+  # Builds each rendered project type with its own flake, the same gate a
+  # generated project's CI runs. Slower than the checker-only tests above, so
+  # it runs as a separate matrix.
+  template:
+    name: Render ${{ matrix.type }}
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [cli, api, both, library]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Render and build
+        run: |
+          out="$RUNNER_TEMP/demo-${{ matrix.type }}"
+          nix run nixpkgs#copier -- copy --trust --defaults \
+            --data project_name=demo-${{ matrix.type }} \
+            --data type=${{ matrix.type }} \
+            --vcs-ref HEAD . "$out"
+          cd "$out"
+          git init -q && git add -A
+          # Check against the rails checker on this branch, not upstream main.
+          nix build '.#default' -L --override-input pythonproject "path:$GITHUB_WORKSPACE"

@@ -1,38 +1,56 @@
 [project]
-name = "pythonproject"
-version = "0.0.0"
-description = "Copier template for grmhay Python projects, and the canonical dev-rails checker"
+name = "{{ project_name }}"
+dynamic = ["version"]
+description = "{{ description }}"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-authors = [{ name = "Graeme Hay", email = "grmhay@gmail.com" }]
-maintainers = [{ name = "Graeme Hay", email = "grmhay@gmail.com" }]
-keywords = ["template", "copier", "rails"]
+authors = [{ name = "{{ author_name }}", email = "{{ author_email }}" }]
+maintainers = [{ name = "{{ author_name }}", email = "{{ author_email }}" }]
+keywords = [{% if type in ['cli', 'both'] %}"cli"{% endif %}{% if type == 'both' %}, {% endif %}{% if type in ['api', 'both'] %}"api"{% endif %}]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 1 - Planning",
+{%- if type in ['cli', 'both'] %}
   "Environment :: Console",
+{%- endif %}
   "Intended Audience :: Developers",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Tools",
   "Typing :: Typed",
 ]
 
-dependencies = ["pyyaml"]
+{% if type == 'library' -%}
+dependencies = []
+{%- elif type == 'cli' -%}
+dependencies = ["click", "fastmcp"]
+{%- elif type == 'api' -%}
+dependencies = ["fastapi", "fastmcp", "uvicorn"]
+{%- else -%}
+dependencies = ["click", "fastapi", "fastmcp", "uvicorn"]
+{%- endif %}
 
 [project.optional-dependencies]
 
-## copier renders the template in the test suite, so every project type is
-## proven to come out on the rails.
-test = ["copier", "mypy", "nox", "pytest", "ruff"]
+test = [{% if type in ['api', 'both'] %}"httpx", {% endif %}"mypy", "nox", "pytest", "anyio", "ruff"]
+{%- if type != 'library' %}
 
 #####################
 ## PROJECT SCRIPTS ##
 #####################
 
 [project.scripts]
-
-check-rails = "rails.check_rails:main"
+{% if type in ['cli', 'both'] %}
+{{ project_name }} = "{{ package_name }}.cli:main"
+{%- endif %}
+{%- if type in ['api', 'both'] %}
+{{ project_name }}-api = "{{ package_name }}.api:run"
+{%- endif %}
+{{ project_name }}-mcp = "{{ package_name }}.mcp_server:run"
+{%- endif %}
 
 ################################
 ## BUILD SYSTEM CONFIGURATION ##
@@ -40,22 +58,30 @@ check-rails = "rails.check_rails:main"
 
 [build-system]
 
-requires = ["setuptools"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 ##############################
 ## SETUPTOOLS CONFIGURATION ##
 ##############################
 
+# Version is derived from git tags by setuptools-scm; never hardcode it.
+# The .git directory is absent from the container build context, so the image
+# build passes the computed value via SETUPTOOLS_SCM_PRETEND_VERSION; this
+# fallback is used only when neither git metadata nor that env var is available.
+[tool.setuptools_scm]
+
+fallback_version = "0.0.0+unknown"
+
 [tool.setuptools.packages.find]
 
 where = ["."]
-include = ["rails*"]
+include = ["{{ package_name }}*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 
-rails = ["rails-spec.toml"]
+{{ package_name }} = ["resources/*"]
 
 ##########################
 ## PYTEST CONFIGURATION ##
@@ -65,7 +91,7 @@ rails = ["rails-spec.toml"]
 
 addopts = ["--doctest-modules"]
 
-testpaths = ["tests", "rails"]
+testpaths = ["tests", "{{ package_name }}"]
 
 ########################
 ## MYPY CONFIGURATION ##
@@ -73,22 +99,15 @@ testpaths = ["tests", "rails"]
 
 [tool.mypy]
 
+{% if type != 'library' -%}
+plugins = ["pydantic.mypy"]
+{% endif -%}
+
 ## The dev rails require every function to be annotated; strict is what
 ## actually enforces that. Keep it on -- a project that turns it off has left
 ## the rails (see the `rails` nox session).
 strict = true
 
-## PyYAML ships no inline stubs. nixpkgs does package types-PyYAML, but the
-## name maps to an attribute the flake's depName helper cannot resolve from a
-## PEP 508 string, so it would have to be hand-added to nativeCheckInputs.
-## yaml is read in exactly one place, behind an isinstance check, so scoping
-## the exemption to that module is the cheaper trade and keeps strict honest
-## everywhere else.
-[[tool.mypy.overrides]]
-
-module = ["yaml"]
-
-ignore_missing_imports = true
 
 ########################
 ## RUFF CONFIGURATION ##
@@ -208,13 +227,6 @@ select = [
 
 ## Ignore specific rules or categories:
 ignore = ["COM812"]
-
-[tool.ruff.lint.per-file-ignores]
-
-## The rails checker is a CLI; stdout is its interface.
-"rails/*.py" = ["T20"]
-## pytest is built on bare asserts.
-"tests/*.py" = ["S101"]
 
 [tool.ruff.lint.pydocstyle]
 

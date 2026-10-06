@@ -22,12 +22,12 @@ skip() { echo -e "${YELLOW}[SKIP]${NC} $1 (manual check required)"; }
 echo "Checking project at: $(pwd)"
 echo "────────────────────────────────────────────────────"
 
-# 1. Package renamed from zamazingo (exclude DEV_RAILS.md which references it as a placeholder)
-if grep -r --include="*.py" --include="*.toml" --include="*.nix" --include="*.md" \
-     -l "zamazingo" . 2>/dev/null | grep -qv ".git\|DEV_RAILS.md"; then
-  fail "Package still named 'zamazingo' — run create-python-project.sh"
+# 1. Generated from (or adopted into) the Copier template, so `copier update`
+#    can pull rails and CI changes into it.
+if [[ -f ".copier-answers.yml" ]]; then
+  ok "Tracks the pythonproject Copier template (.copier-answers.yml)"
 else
-  ok "Package renamed from 'zamazingo'"
+  fail "No .copier-answers.yml — generate with create-python-project.sh or adopt with 'copier copy'"
 fi
 
 # 2. flake.nix exists (prerequisite for 'nix develop')

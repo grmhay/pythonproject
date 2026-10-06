@@ -1,12 +1,13 @@
 {
-  description = "Copier template for grmhay Python projects, and the canonical dev-rails checker";
+  description = "{{ description }}";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    pythonproject.url = "github:grmhay/pythonproject";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }:
+  outputs = { self, nixpkgs, flake-utils, pythonproject, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         ## Import nixpkgs:
@@ -27,18 +28,23 @@
         ## Resolve test Python dependencies from pyproject.toml:
         testDeps = map (dep: pkgs.python3Packages.${depName dep}) project."optional-dependencies".test;
 
-        ## The canonical dev-rails checker. This repo is its source, so it is
-        ## built from ./rails here; generated projects take the same derivation
-        ## from their pythonproject flake input (see template/flake.nix.jinja).
-        railsChecker = import ./rails/checker.nix { inherit pkgs; };
+        ## The canonical dev-rails checker, pinned in flake.lock. One
+        ## definition lives upstream; this repo does not vendor a copy.
+        railsChecker = pythonproject.packages.${system}.check-rails;
 
         ## Get the package:
         package = pkgs.python3Packages.buildPythonPackage {
           ## Set the package name:
           pname = project.name;
 
-          ## Inherit the package version:
-          inherit (project) version;
+          ## The version is dynamic (setuptools-scm), so project.version is
+          ## normally absent; the dev shell does not need a real one.
+          version = project.version or "0.0.0+dev";
+
+          ## The build source is a nix store path with no .git, so setuptools-scm
+          ## cannot derive a version here. Pin it to the derivation version so the
+          ## wheel is reproducible (mirrors the container's build-arg approach).
+          SETUPTOOLS_SCM_PRETEND_VERSION = project.version or "0.0.0+dev";
 
           ## Set the package format:
           format = "pyproject";
@@ -49,15 +55,12 @@
           ## Specify the build system to use:
           build-system = with pkgs.python3Packages; [
             setuptools
+            setuptools-scm
           ];
 
           ## Specify test dependencies (Python deps from pyproject.toml + non-Python tools):
           nativeCheckInputs = testDeps ++ [
             pkgs.taplo
-
-            ## copier shells out to git even for a template that is not a
-            ## repo, which is what the test suite renders from in the sandbox.
-            pkgs.git
 
             ## The `rails` session runs inside checkPhase too, so the checker
             ## has to be here as well as in the dev shell.
@@ -78,7 +81,9 @@
         ## Make our package editable:
         editablePackage = pkgs.python3.pkgs.mkPythonEditablePackage {
           pname = project.name;
-          inherit (project) scripts version;
+          ## A library has no [project.scripts] table.
+          scripts = project.scripts or { };
+          version = project.version or "0.0.0+dev";
           root = "$PWD";
         };
       in
@@ -86,7 +91,6 @@
         ## Project packages output:
         packages = {
           "${project.name}" = package;
-          check-rails = railsChecker;
           default = self.packages.${system}.${project.name};
         };
 

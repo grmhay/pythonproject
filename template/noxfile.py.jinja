@@ -14,13 +14,21 @@ A few examples for invoking `nox`:
     nox -k "not mypy and not pytest"
 """
 
+import importlib
+import sys
+from pathlib import Path
+
 import nox
+
+#: Project-specific sessions; see the bottom of this file.
+_local = Path(__file__).with_name("noxfile_local.py")
 
 #: Files and directories of interest.
 paths = [
     "noxfile.py",
-    "rails",
     "tests",
+    "{{ package_name }}",
+    *([_local.name] if _local.exists() else []),
 ]
 
 
@@ -84,3 +92,11 @@ def mypy(session: nox.Session) -> None:
 def pytest(session: nox.Session) -> None:
     """Run the test suite."""
     session.run("pytest", external=True)
+
+
+## Project-specific sessions live in noxfile_local.py, which the template never
+## touches, so `copier update` can keep this file in sync with the rails.
+## Importing it is enough: nox registers sessions as they are decorated.
+if _local.exists():
+    sys.path.insert(0, str(_local.parent))
+    importlib.import_module(_local.stem)

@@ -1,134 +1,73 @@
-# Python CLI Project Template
+# pythonproject
 
-This is a template for creating modern Python CLI applications with comprehensive tooling and best practices.
+The [Copier](https://copier.readthedocs.io) template for grmhay Python
+projects, and the source of the canonical dev-rails checker they are held to.
 
-## Using This Template
-
-To create a new project from this template:
-
-1. Clone or download this repository
-2. Run the configuration script with your desired project name and type:
+## Generate a project
 
 ```sh
-# CLI project (default)
-./create-python-project.sh my-project-name
-
-# FastAPI project
-./create-python-project.sh my-project-name --type=api
-
-# CLI + FastAPI in one project
-./create-python-project.sh my-project-name --type=both
+git clone https://github.com/grmhay/pythonproject /tmp/pythonproject
+bash /tmp/pythonproject/create-python-project.sh my-project --type=cli|api|both|library
 ```
 
-| `--type` | Entry point | Dependencies |
-|----------|-------------|--------------|
-| `cli` (default) | `cli.py` via Click | `click` |
-| `api` | `api.py` via FastAPI + uvicorn | `fastapi`, `uvicorn[standard]`, `httpx` (test) |
-| `both` | `cli.py` + `api.py` | all of the above |
+The script renders `./my-project` from `gh:grmhay/pythonproject` (latest tag),
+initialises git on `main`, pins the rails checker in `flake.lock`, installs the
+community skills, and offers to create the GitHub repo. Plain Copier works too:
 
-**Important**: The `create-python-project.sh` script is a one-time use script that configures the template for your new project. After running it:
-- The script renames the `zamazingo` package directory to your project name
-- Updates all references throughout the codebase
-- Patches `pyproject.toml` and `flake.nix` for the chosen project type
-- Updates the README with project-specific content
-- Commits the changes to git
-- **Removes itself** - the script deletes itself after successful configuration
+```sh
+nix run nixpkgs#copier -- copy --trust gh:grmhay/pythonproject my-project
+```
 
-The script validates project names to ensure they work as Python packages and handles the conversion of hyphens to underscores where needed for Python imports.
+| `type` | Entry points | Container + deploy PR |
+|--------|--------------|-----------------------|
+| `cli` | Click CLI, MCP server | yes |
+| `api` | FastAPI + uvicorn, MCP server | yes |
+| `both` | CLI, API, MCP server | yes |
+| `library` | none | no; CI runs the gate and rails check only |
+
+## Keep a project up to date
+
+Inside a generated project:
+
+```sh
+nix run nixpkgs#copier -- update --trust
+```
+
+Template changes are merged three-way into the files the template manages
+(noxfile, flake, CI, sandbox loop, pre-commit, `DEV_RAILS.md`). Files listed in
+`_skip_if_exists` in `copier.yml` belong to the project and are never touched.
+Project-specific nox sessions go in `noxfile_local.py`.
+
+To adopt the template in a project that predates it, run `copier copy` over the
+existing checkout with answers matching the project, then review the diff hunk
+by hunk before committing `.copier-answers.yml`.
+
+## Layout
+
+| Path | What it is |
+|------|-----------|
+| `copier.yml` | Template questions and the managed / project-owned split |
+| `template/` | What gets rendered into a project |
+| `rails/` | The dev-rails checker (`check-rails`) and its spec; exposed as the flake's `check-rails` package |
+| `.github/workflows/rails-check.yml` | Reusable workflow generated projects call to run the checker independently of their own noxfile |
+| `create-python-project.sh` | Generator wrapper around `copier copy` |
 
 ## Develop
 
-Enter the Nix shell with:
-
 ```sh
 nix develop
-```
-
-Then run the tests with:
-
-```sh
 nox
 ```
 
-To see the available sessions, run:
+The test suite renders every project type and runs the rails checker on it.
+CI additionally builds each rendered type with its own flake, overriding the
+`pythonproject` input with the branch under test.
+
+Release by tagging `vX.Y.Z`; `copier copy` and `copier update` default to the
+latest tag.
+
+## Verify a generated project
 
 ```sh
-nox --list
+bash check-python-project-setup.sh   # inside the project
 ```
-
-To format the codebase:
-
-```sh
-nox -s format -- --fix
-```
-
-## Build
-
-To check and build the package, run:
-
-```sh
-nix build
-```
-
-## Run
-
-To run the package, use:
-
-```sh
-nix run
-```
-
-... and with arguments:
-
-```sh
-nix run . -- --name=there --count=3
-```
-
-## Sandbox Loop
-
-The Sandbox Loop runs Claude Code against GitHub Issues labelled `ready-for-agent`, implements them inside an isolated Docker container, and opens a pull request per issue.
-
-### First-time setup
-
-Copy `.sandcastle/.env.example` to `.sandcastle/.env` and fill in your credentials:
-
-```sh
-cp .sandcastle/.env.example .sandcastle/.env
-```
-
-Build the sandbox Docker image (only needed once, or after editing `.sandcastle/Dockerfile`):
-
-```sh
-npx sandcastle docker build-image
-```
-
-### Running the loop
-
-1. Apply the `ready-for-agent` label to any fully-specified issue
-2. Run the loop:
-   ```sh
-   npm run sandcastle
-   ```
-3. The agent opens a PR per issue and moves the label from `ready-for-agent` to `ready-for-human`
-4. Review and merge the PR
-
-### Prerequisites
-
-- Docker running locally
-- `gh` CLI authenticated (`gh auth login`)
-- `ANTHROPIC_API_KEY` and `GITHUB_TOKEN` set in `.sandcastle/.env`
-
-## Verifying a project setup
-
-After bootstrapping a project, you can verify it is fully configured by running:
-
-```sh
-bash check-python-project-setup.sh /path/to/your/project
-```
-
-This checks package renaming, nix config, pre-commit hooks, prd/plans directories, CLAUDE.md, all Matt Pocock skills, and machine-level Claude skills.
-
-## Developing this project
-Because running the create-python-project.sh script ultimately deletes the script, you have to clone the repo locally, edit the script if that is what you are working on, commit and push the change then test it.
-
-If it all goes to cr*p then you can just sudo \rm -r pythonproject and clone it again.

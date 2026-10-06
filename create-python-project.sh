@@ -44,429 +44,13 @@ validate_project_name() {
         print_error "Project name cannot be empty"
         return 1
     fi
-    if [[ ! "$name" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]]; then
-        print_error "Project name must start with a letter and contain only letters, numbers, underscores, and hyphens"
-        return 1
-    fi
-    local python_name="${name//-/_}"
-    if [[ ! "$python_name" =~ ^[a-zA-Z][a-zA-Z0-9_]*$ ]]; then
-        print_error "Project name contains invalid characters for Python package"
+    # Same rule as copier.yml's validator: a distribution name whose import
+    # name is the hyphens-to-underscores form.
+    if [[ ! "$name" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]]; then
+        print_error "Project name must be lowercase letters, digits and hyphens, starting with a letter"
         return 1
     fi
     return 0
-}
-
-# ── Package renaming ──────────────────────────────────────────────────────────
-
-rename_package_directory() {
-    local old_name="$1"
-    local new_name="$2"
-    local python_name="${new_name//-/_}"
-    if [[ -d "$old_name" ]]; then
-        mv "$old_name" "$python_name"
-        print_success "Renamed directory: $old_name -> $python_name"
-    fi
-}
-
-replace_content() {
-    local old_name="$1"
-    local new_name="$2"
-    local project_type="${3:-cli}"
-    local python_name="${new_name//-/_}"
-
-    print_info "Replacing content in files"
-
-    local files_to_update=(
-        "pyproject.toml"
-        "noxfile.py"
-        "CLAUDE.md"
-        "Dockerfile"
-        "package.json"
-        "$python_name/__init__.py"
-        "$python_name/cli.py"
-        "$python_name/api.py"
-        "$python_name/resources/__init__.py"
-        "tests/test_cli.py"
-        "tests/test_api.py"
-        "tests/test_utils.py"
-    )
-
-    for file in "${files_to_update[@]}"; do
-        if [[ -f "$file" ]]; then
-            sed -i "s/$old_name/$python_name/g" "$file"
-            if [[ "$file" == "pyproject.toml" ]]; then
-                sed -i "s/name = \"$python_name\"/name = \"$new_name\"/" "$file"
-                sed -i "s/prog_name=\"$python_name\"/prog_name=\"$new_name\"/" "$file"
-            fi
-            if [[ "$file" == *"cli.py" ]]; then
-                sed -i "s/prog_name=\"$python_name\"/prog_name=\"$new_name\"/" "$file"
-                sed -i "s/I am $python_name/I am $new_name/g" "$file"
-            fi
-            if [[ "$file" == *"api.py" ]]; then
-                sed -i "s/title=\"$python_name\"/title=\"$new_name\"/" "$file"
-            fi
-            if [[ "$file" == "Dockerfile" ]]; then
-                # The CLI entrypoint command uses hyphens (new_name), not underscores (python_name)
-                sed -i "s/ENTRYPOINT \[\"$python_name\"\]/ENTRYPOINT [\"$new_name\"]/" "$file"
-            fi
-            if [[ "$file" == "CLAUDE.md" ]]; then
-                local gh_user=""
-                if command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
-                    gh_user=$(gh api user --jq .login 2>/dev/null || echo "")
-                fi
-                if [[ -n "$gh_user" ]]; then
-                    sed -i "s|github\.com/grmhay/pythonproject|github.com/$gh_user/$new_name|g" "$file"
-                else
-                    sed -i "s|github\.com/grmhay/pythonproject|github.com/<your-username>/$new_name|g" "$file"
-                fi
-            fi
-            print_success "Updated: $file"
-        fi
-    done
-
-    # Remove files not needed for this project type
-    case "$project_type" in
-        cli)
-            rm -f "$python_name/api.py" "tests/test_api.py"
-            print_info "Removed API files (CLI-only project)"
-            ;;
-        api)
-            rm -f "$python_name/cli.py" "tests/test_cli.py"
-            print_info "Removed CLI files (API-only project)"
-            ;;
-        both)
-            print_info "Keeping both CLI and API files"
-            ;;
-    esac
-}
-
-patch_for_type() {
-    local python_name="$1"
-    local new_name="$2"
-    local project_type="$3"
-
-    [[ "$project_type" == "cli" ]] && return 0
-
-    print_info "Patching project files for type: $project_type"
-
-    case "$project_type" in
-        api)
-            sed -i 's/dependencies = \["click"\]/dependencies = ["fastapi", "uvicorn[standard]"]/' pyproject.toml
-            sed -i 's/test = \["mypy", "nox", "pytest", "anyio", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "anyio", "ruff"]/' pyproject.toml
-            sed -i "s/${python_name} = \"${python_name}\.cli:main\"/${python_name} = \"${python_name}.api:run\"/" pyproject.toml
-            sed -i 's/Yet Another Python CLI Application/Yet Another Python API/' pyproject.toml
-            sed -i 's/keywords = \["cli"\]/keywords = ["api"]/' pyproject.toml
-            sed -i '/"Environment :: Console",/d' pyproject.toml
-            sed -i 's/a CLI tool/an API/' "${python_name}/__init__.py"
-            sed -i 's/pkgs\.python3Packages\.click/pkgs.python3Packages.fastapi\n            pkgs.python3Packages.uvicorn/' flake.nix
-            sed -i 's/pkgs\.python3Packages\.pytest$/pkgs.python3Packages.pytest\n            pkgs.python3Packages.httpx/' flake.nix
-            print_success "Patched for API: fastapi+uvicorn deps, api entrypoint."
-            ;;
-        both)
-            sed -i 's/dependencies = \["click"\]/dependencies = ["click", "fastapi", "uvicorn[standard]"]/' pyproject.toml
-            sed -i 's/test = \["mypy", "nox", "pytest", "anyio", "ruff"\]/test = ["httpx", "mypy", "nox", "pytest", "anyio", "ruff"]/' pyproject.toml
-            sed -i "/${python_name} = \"${python_name}\.cli:main\"/a ${new_name}-api = \"${python_name}.api:run\"" pyproject.toml
-            sed -i 's/Yet Another Python CLI Application/Yet Another Python Application/' pyproject.toml
-            sed -i 's/keywords = \["cli"\]/keywords = ["cli", "api"]/' pyproject.toml
-            sed -i 's/a CLI tool/a CLI tool and API/' "${python_name}/__init__.py"
-            sed -i 's/pkgs\.python3Packages\.click/pkgs.python3Packages.click\n            pkgs.python3Packages.fastapi\n            pkgs.python3Packages.uvicorn/' flake.nix
-            sed -i 's/pkgs\.python3Packages\.pytest$/pkgs.python3Packages.pytest\n            pkgs.python3Packages.httpx/' flake.nix
-            print_success "Patched for CLI+API: click+fastapi+uvicorn deps, both entrypoints."
-            ;;
-    esac
-}
-
-update_readme() {
-    local project_name="$1"
-    local project_type="${2:-cli}"
-    local readme_file="README.md"
-
-    local type_desc
-    case "$project_type" in
-        cli)  type_desc="A Python CLI application." ;;
-        api)  type_desc="A Python API application." ;;
-        both) type_desc="A Python application with CLI and API." ;;
-    esac
-
-    if [[ -f "$readme_file" ]]; then
-        cat > "$readme_file" << EOF
-# $project_name
-
-$type_desc
-
-## Develop
-
-Enter the Nix shell with:
-
-\`\`\`sh
-nix develop
-\`\`\`
-
-Then run the tests with:
-
-\`\`\`sh
-nox
-\`\`\`
-
-To see the available sessions, run:
-
-\`\`\`sh
-nox --list
-\`\`\`
-
-To format the codebase:
-
-\`\`\`sh
-nox -s format -- --fix
-\`\`\`
-
-## Build
-
-To check and build the package, run:
-
-\`\`\`sh
-nix build
-\`\`\`
-
-## Run
-EOF
-
-        case "$project_type" in
-            cli)
-                cat >> "$readme_file" << EOF
-
-To run the CLI, use:
-
-\`\`\`sh
-nix run
-\`\`\`
-
-... and with arguments:
-
-\`\`\`sh
-nix run . -- --name=there --count=3
-\`\`\`
-EOF
-                ;;
-            api)
-                cat >> "$readme_file" << EOF
-
-To start the API server:
-
-\`\`\`sh
-nix run
-\`\`\`
-
-The API will be available at <http://localhost:8000>.
-Docs at <http://localhost:8000/docs>.
-EOF
-                ;;
-            both)
-                cat >> "$readme_file" << EOF
-
-Inside \`nix develop\`, run the CLI:
-
-\`\`\`sh
-$project_name --name=there --count=3
-\`\`\`
-
-Start the API server:
-
-\`\`\`sh
-${project_name}-api
-\`\`\`
-
-The API will be available at <http://localhost:8000>.
-Docs at <http://localhost:8000/docs>.
-EOF
-                ;;
-        esac
-
-        cat >> "$readme_file" << 'EOF'
-
-## Sandbox Loop
-
-The Sandbox Loop runs Claude Code against GitHub Issues labelled `ready-for-agent`, implements them inside an isolated Docker container, and opens a pull request per issue.
-
-### First-time setup
-
-Copy `.sandcastle/.env.example` to `.sandcastle/.env` and fill in your credentials:
-
-```sh
-cp .sandcastle/.env.example .sandcastle/.env
-```
-
-Build the sandbox Docker image (only needed once, or after editing `.sandcastle/Dockerfile`):
-
-```sh
-npx sandcastle docker build-image
-```
-
-### Running the loop
-
-1. Apply the `ready-for-agent` label to any fully-specified issue
-2. Run the loop:
-   ```sh
-   npm run sandcastle
-   ```
-3. The agent opens a PR per issue and moves the label from `ready-for-agent` to `ready-for-human`
-4. Review and merge the PR
-
-### Prerequisites
-
-- Docker running locally
-- `gh` CLI authenticated (`gh auth login`)
-- `ANTHROPIC_API_KEY` and `GITHUB_TOKEN` set in `.sandcastle/.env`
-EOF
-
-        print_success "Updated README.md"
-    fi
-}
-
-# ── Dev rails setup ───────────────────────────────────────────────────────────
-
-setup_dev_rails() {
-    print_info "Setting up dev rails..."
-
-    # Point the rails checker at the pythonproject flake input rather than
-    # vendoring a copy. A vendored rails/ would drift the moment anyone edited
-    # it, which is the exact failure the checker exists to catch -- so the
-    # generated project consumes the derivation from upstream and pins it in
-    # flake.lock instead.
-    if grep -q "RAILS-CHECKER" flake.nix; then
-        sed -i 's|^\( *\)railsChecker = import ./rails/checker.nix { inherit pkgs; };|\1railsChecker = pythonproject.packages.${system}.check-rails;|' flake.nix
-        sed -i '/## RAILS-CHECKER/d' flake.nix
-        # Declare the input and thread it through the outputs function.
-        sed -i 's|^\( *\)flake-utils.url = "github:numtide/flake-utils";|\1flake-utils.url = "github:numtide/flake-utils";\n\1pythonproject.url = "github:grmhay/pythonproject";|' flake.nix
-        sed -i 's|outputs = { self, nixpkgs, flake-utils, ... }:|outputs = { self, nixpkgs, flake-utils, pythonproject, ... }:|' flake.nix
-        rm -rf rails
-        # rails/ only exists in the template, where it is the checker's source
-        # and is linted like any other code. A generated project has no copy,
-        # so drop it from the noxfile's paths.
-        sed -i '/^    "rails",$/d' noxfile.py
-        # The yaml override and the T20 exemption both exist only for the
-        # checker's own source; a generated project has neither. Remove each
-        # block whole, comments included, rather than leaving an orphaned
-        # heading behind.
-        sed -i '/^## PyYAML ships no inline stubs\./,/^ignore_missing_imports = true$/d' pyproject.toml
-        sed -i '/^\[tool.ruff.lint.per-file-ignores\]$/,/^\[tool.ruff.lint.pydocstyle\]$/{/^\[tool.ruff.lint.pydocstyle\]$/!d}' pyproject.toml
-        # Add the independent rails check. It lives here rather than in the
-        # template's own workflow because pythonproject IS the checker's
-        # source: its `quality` job already runs the canonical checker from
-        # its own tree, and a self-reference to @main cannot resolve on a
-        # branch where the workflow does not yet exist -- which fails the
-        # whole run, not just that job.
-        local publish_workflow=".github/workflows/docker-publish.yml"
-        if [[ -f "$publish_workflow" ]] && ! grep -q "rails-check:" "$publish_workflow"; then
-            sed -i 's|^  build-and-push:$|  # Independent of this repo'"'"'s own noxfile: catches a project that\n  # dropped the rails session or narrowed its spec, which `quality` cannot see.\n  rails-check:\n    uses: grmhay/pythonproject/.github/workflows/rails-check.yml@main\n\n  build-and-push:|' "$publish_workflow"
-            sed -i 's|^    needs: quality$|    needs: [quality, rails-check]|' "$publish_workflow"
-            print_success "Added the rails-check job to CI."
-        fi
-
-        # Add the deploy-PR job. Like rails-check, this lives here rather than
-        # in the template because pythonproject is public and the ops control
-        # plane is private -- and a public repo cannot call a private repo's
-        # reusable workflow, which fails the whole run, not just the job.
-        if [[ -f "$publish_workflow" ]] && ! grep -q "deploy-pr:" "$publish_workflow"; then
-            cat >> "$publish_workflow" << 'DEPLOYPR'
-
-  # Opens or updates the single deploy/<stack> PR in the ops control plane,
-  # bumping the pinned digest to this build. Merging that PR is the approval
-  # point; the reconciler rolls it out from there. Stays dormant until the
-  # image actually publishes, since digest is empty until then.
-  deploy-pr:
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main' && needs.build-and-push.outputs.digest != ''
-    uses: grmhay/homelab-opscontrolplane/.github/workflows/deploy-pr.yml@master
-    with:
-      image: ${{ needs.build-and-push.outputs.image }}
-      digest: ${{ needs.build-and-push.outputs.digest }}
-      source-sha: ${{ github.sha }}
-    secrets:
-      token: ${{ secrets.OPS_DEPLOY_PAT }}
-DEPLOYPR
-            print_success "Added the deploy-PR job to CI."
-        fi
-
-        print_success "Rails checker sourced from the pythonproject flake input."
-    else
-        print_warning "Could not find the RAILS-CHECKER marker in flake.nix — wire the rails checker manually."
-    fi
-
-    # Add pre-commit to flake.nix dev shell
-    if grep -q "pre-commit" flake.nix; then
-        print_warning "pre-commit already present in flake.nix — skipping."
-    else
-        if grep -q "ipython" flake.nix; then
-            sed -i 's/ipython/ipython\n            pre-commit/' flake.nix
-            print_success "Added pre-commit to flake.nix."
-        else
-            print_warning "Could not auto-patch flake.nix — add 'pre-commit' to devShell packages manually."
-        fi
-    fi
-
-    # Create .pre-commit-config.yaml
-    if [[ -f .pre-commit-config.yaml ]]; then
-        print_warning ".pre-commit-config.yaml already exists — skipping."
-    else
-        cat > .pre-commit-config.yaml << 'EOF'
-repos:
-  - repo: local
-    hooks:
-      - id: nox
-        name: nox
-        entry: nox
-        language: system
-        pass_filenames: false
-        always_run: true
-EOF
-        print_success "Created .pre-commit-config.yaml."
-    fi
-
-    # Create prd/ and plans/ directories
-    mkdir -p prd plans
-    touch prd/.gitkeep plans/.gitkeep
-    print_success "Created prd/ and plans/ directories."
-
-    # Append dev rails section to CLAUDE.md
-    local DEV_RAILS_MARKER="## Dev rails"
-    if grep -q "${DEV_RAILS_MARKER}" CLAUDE.md 2>/dev/null; then
-        print_warning "Dev rails section already present in CLAUDE.md — skipping."
-    else
-        cat >> CLAUDE.md << 'EOF'
-
-## Dev rails
-
-### Environment
-- Always work inside `nix develop`; never use pip or venv directly
-- Run `nox` to validate all six sessions: taplo → format → check → rails → mypy → pytest
-
-### Code conventions
-- Every module must have a corresponding test file in `tests/`
-- Annotate every function — mypy strict is enforced
-- Write doctests in pure utility functions (they run via `--doctest-modules`)
-- Use `importlib.resources` to access files in the package `resources/` directory
-- Use `importlib.metadata` for version retrieval; never hardcode version strings
-
-### Feedback loops
-Run before committing: `nox`
-Run a single session: `nox -s mypy`, `nox -s pytest`, `nox -s check`
-Auto-fix formatting: `nox -s format -- --fix`
-
-### Planning artefacts
-- PRD files live in `prd/`
-- Implementation plans live in `plans/`
-
-### Daily workflow
-New feature?   → /grill-with-docs → /to-prd → /to-issues
-Start issue?   → /clear → @prd @plan "Do issue #N"
-Write logic?   → /tdd (red-green-refactor, one test at a time)
-Hard bug?      → /diagnose
-Validate?      → nox
-Architecture?  → /improve-codebase-architecture (run every few days)
-EOF
-        print_success "Dev rails section appended to CLAUDE.md."
-    fi
 }
 
 # ── Docker Hub secrets ───────────────────────────────────────────────────────
@@ -493,6 +77,13 @@ setup_docker_secrets() {
 
     if ! gh repo view "$gh_user/$project_name" &>/dev/null 2>&1; then
         print_warning "Repo $gh_user/$project_name not found on GitHub — skipping Docker Hub secrets setup."
+        return 0
+    fi
+
+    # Never create anything remote without a human answering: with no
+    # terminal, a timed-out or swallowed prompt would otherwise read as "yes".
+    if [[ ! -t 0 ]]; then
+        print_info "No terminal — skipping Docker Hub secrets setup. Run it by hand later."
         return 0
     fi
 
@@ -549,72 +140,6 @@ install_skills() {
         || print_warning "Skills install failed — run 'npx skills@latest add mattpocock/skills' manually"
 }
 
-# ── Git setup ─────────────────────────────────────────────────────────────────
-
-validate_git_url() {
-    local url="$1"
-    if [[ "$url" =~ ^https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
-       [[ "$url" =~ ^git@github\.com:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
-       [[ "$url" =~ ^https://gitlab\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
-       [[ "$url" =~ ^git@gitlab\.com:[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]] || \
-       [[ "$url" =~ ^https://[a-zA-Z0-9.-]+/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\.git$ ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-display_git_options() {
-    echo ""
-    print_info "Git repository configuration options:"
-    echo ""
-    print_info "1) Keep existing git history and update remote URL"
-    print_info "2) Start fresh (remove git history and initialize new repository)"
-    print_info "3) Keep existing git history and remote (no changes)"
-    print_info "4) Skip git configuration entirely"
-    echo ""
-}
-
-get_git_choice() {
-    while true; do
-        if read -t 10 -p "Choose an option [1-4] (default: 2 in 10s): " choice; then
-            choice="${choice:-2}"
-        else
-            echo "" >&2
-            choice="2"
-        fi
-        case $choice in
-            [1-4]) echo "$choice"; break;;
-            *) print_warning "Please enter a number between 1 and 4";;
-        esac
-    done
-}
-
-get_remote_url() {
-    local project_name="$1"
-    echo ""
-    print_info "Enter the URL for your new git repository."
-    print_info "Examples:"
-    print_info "  https://github.com/username/$project_name.git"
-    print_info "  git@github.com:username/$project_name.git"
-    echo ""
-    while true; do
-        read -p "Remote URL: " remote_url
-        if [[ -z "$remote_url" ]]; then
-            print_warning "URL cannot be empty. Please enter a valid git repository URL."
-            continue
-        fi
-        if validate_git_url "$remote_url"; then
-            echo "$remote_url"
-            break
-        else
-            print_warning "Invalid URL format. Please enter a valid git repository URL."
-            print_info "Supported formats: GitHub, GitLab HTTPS/SSH URLs"
-        fi
-    done
-}
-
-# Issue #8: offer to create GitHub repo after fresh init
 setup_github_remote() {
     local project_name="$1"
 
@@ -623,12 +148,19 @@ setup_github_remote() {
         print_info "Install gh from https://cli.github.com then run:"
         print_info "  gh repo create $project_name --public"
         print_info "  git remote add origin <url>"
-        print_info "  git push -u origin master"
+        print_info "  git push -u origin main"
         return 0
     fi
 
     if ! gh auth status &>/dev/null 2>&1; then
         print_warning "gh CLI not authenticated — run 'gh auth login' then set up the remote manually."
+        return 0
+    fi
+
+    # Never create anything remote without a human answering: with no
+    # terminal, a timed-out or swallowed prompt would otherwise read as "yes".
+    if [[ ! -t 0 ]]; then
+        print_info "No terminal — skipping GitHub repo creation. Run it by hand later."
         return 0
     fi
 
@@ -638,7 +170,7 @@ setup_github_remote() {
     create_repo="${create_repo:-Y}"
     if [[ "$create_repo" =~ ^[Nn]$ ]]; then
         print_info "Skipping GitHub remote setup."
-        print_info "To set up later: gh repo create $project_name --public && git remote add origin <url> && git push -u origin master"
+        print_info "To set up later: gh repo create $project_name --public && git remote add origin <url> && git push -u origin main"
         return 0
     fi
 
@@ -653,146 +185,48 @@ setup_github_remote() {
     print_success "GitHub repo created and pushed: https://github.com/$(gh api user --jq .login)/$project_name"
 }
 
-init_git() {
-    local project_name="$1"
-    local git_mode="${2:-}"  # Issue #3: optional non-interactive mode
-
-    if ! command -v git &> /dev/null; then
-        print_warning "Git not found, skipping repository initialization"
-        return 0
-    fi
-
-    # No existing repo — just init fresh
-    if [[ ! -d ".git" ]]; then
-        print_info "No git repository found, initializing new repository"
-        git init
-        git add .
-        git commit -m "Initial commit: $project_name project from template"
-        print_success "New git repository initialized"
-        setup_github_remote "$project_name"
-        return 0
-    fi
-
-    # Non-interactive mode (Issue #3)
-    if [[ -n "$git_mode" ]]; then
-        case "$git_mode" in
-            fresh)
-                print_info "Git mode: fresh"
-                rm -rf .git
-                git init
-                git add .
-                git commit -m "Initial commit: $project_name project from template"
-                print_success "Fresh git repository initialized"
-                setup_github_remote "$project_name"
-                ;;
-            keep-remote)
-                print_info "Git mode: keep-remote"
-                git add .
-                git commit -m "Configured template for project: $project_name"
-                print_success "Git repository updated (remote unchanged)"
-                ;;
-            keep)
-                print_info "Git mode: keep"
-                git add .
-                git commit -m "Configured template for project: $project_name"
-                print_success "Git repository updated (remote unchanged)"
-                ;;
-            skip)
-                print_info "Git mode: skip — skipping git configuration"
-                ;;
-            *)
-                print_error "Unknown --git-mode value '$git_mode'. Use: fresh, keep-remote, keep, skip"
-                exit 1
-                ;;
-        esac
-        print_success "Git configuration completed"
-        return 0
-    fi
-
-    # Interactive mode
-    local current_remote=$(git remote get-url origin 2>/dev/null || echo "")
-    if [[ -n "$current_remote" ]]; then
-        print_info "Current git remote origin: $current_remote"
-    else
-        print_info "No git remote origin configured"
-    fi
-    display_git_options
-    local choice=$(get_git_choice)
-    case $choice in
-        1)
-            local new_remote=$(get_remote_url "$project_name")
-            if [[ -n "$current_remote" ]]; then
-                git remote set-url origin "$new_remote"
-                print_success "Updated git remote origin to: $new_remote"
-            else
-                git remote add origin "$new_remote"
-                print_success "Added git remote origin: $new_remote"
-            fi
-            git add .
-            git commit -m "Configured template for project: $project_name"
-            print_info "To push: git push -u origin master"
-            ;;
-        2)
-            print_info "Removing existing git history..."
-            rm -rf .git
-            git init
-            git add .
-            git commit -m "Initial commit: $project_name project from template"
-            print_success "Fresh git repository initialized"
-            setup_github_remote "$project_name"
-            ;;
-        3)
-            git add .
-            git commit -m "Configured template for project: $project_name"
-            print_success "Git repository updated (remote unchanged)"
-            ;;
-        4)
-            print_info "Skipping git configuration"
-            return 0
-            ;;
-    esac
-    print_success "Git configuration completed"
-}
-
 # ── Main ──────────────────────────────────────────────────────────────────────
+
+usage() {
+    echo "Usage: $0 <project-name> [--type=cli|api|both|library] [--template=SRC] [--vcs-ref=REF] [--defaults]"
+    echo ""
+    echo "Generates a new Python project from the pythonproject Copier template in"
+    echo "./<project-name>, then initialises git, pins the flake and offers to create"
+    echo "the GitHub repo. Later template changes are pulled with 'copier update'."
+    echo ""
+    echo "Options:"
+    echo "  --type=cli              CLI project using Click              [default]"
+    echo "  --type=api              FastAPI project"
+    echo "  --type=both             CLI + FastAPI in one project"
+    echo "  --type=library          Library: no entry points, no container"
+    echo "  --template=SRC          Template source        [default: gh:grmhay/pythonproject]"
+    echo "  --vcs-ref=REF           Template tag or branch [default: latest tag]"
+    echo "  --defaults              Accept defaults for the remaining template questions"
+    echo ""
+    echo "Examples:"
+    echo "  $0 my-awesome-cli"
+    echo "  $0 my-awesome-api --type=api"
+    echo "  $0 homelab-fleet-common --type=library"
+}
 
 main() {
     if [[ $# -eq 0 ]]; then
-        echo "Usage: $0 <project-name> [--type=cli|api|both] [--git-mode=fresh|keep-remote|keep|skip]"
-        echo ""
-        echo "Bootstraps a new Python project from the pythonproject template."
-        echo "Renames the package, wires up dev rails, and configures git."
-        echo ""
-        echo "Options:"
-        echo "  --type=cli              CLI project using Click              [default]"
-        echo "  --type=api              FastAPI project"
-        echo "  --type=both             CLI + FastAPI in one project"
-        echo "  --git-mode=fresh        Start fresh (remove history, new repo)"
-        echo "  --git-mode=keep-remote  Keep history, commit changes, keep remote"
-        echo "  --git-mode=keep         Alias for keep-remote"
-        echo "  --git-mode=skip         Skip all git configuration"
-        echo ""
-        echo "Examples:"
-        echo "  $0 my-awesome-cli"
-        echo "  $0 my-awesome-api --type=api"
-        echo "  $0 my-awesome-app --type=both"
-        echo "  $0 my-awesome-cli --git-mode=keep-remote"
+        usage
         exit 1
     fi
 
     local project_name="$1"
     local project_type="cli"
-    local git_mode=""
+    local template="gh:grmhay/pythonproject"
+    local vcs_ref=""
+    local defaults=0
 
-    # Parse flags
     for arg in "${@:2}"; do
         case "$arg" in
-            --type=*)
-                project_type="${arg#--type=}"
-                ;;
-            --git-mode=*)
-                git_mode="${arg#--git-mode=}"
-                ;;
+            --type=*)     project_type="${arg#--type=}" ;;
+            --template=*) template="${arg#--template=}" ;;
+            --vcs-ref=*)  vcs_ref="${arg#--vcs-ref=}" ;;
+            --defaults)   defaults=1 ;;
             *)
                 print_error "Unknown argument: $arg"
                 exit 1
@@ -801,8 +235,8 @@ main() {
     done
 
     case "$project_type" in
-        cli|api|both) ;;
-        *) print_error "Unknown --type value '$project_type'. Use: cli, api, both"; exit 1 ;;
+        cli|api|both|library) ;;
+        *) print_error "Unknown --type value '$project_type'. Use: cli, api, both, library"; exit 1 ;;
     esac
 
     check_dependencies
@@ -812,44 +246,38 @@ main() {
         exit 1
     fi
 
-    if [[ ! -d "zamazingo" ]]; then
-        print_error "zamazingo directory not found. Are you running this from a cloned template?"
+    if [[ -e "$project_name" ]]; then
+        print_error "'$project_name' already exists here. Pick another name or directory."
         exit 1
     fi
 
-    local python_name="${project_name//-/_}"
+    print_info "Generating $project_name (type: $project_type) from $template"
+    local copier_args=(copy --trust --data "project_name=$project_name" --data "type=$project_type")
+    [[ -n "$vcs_ref" ]] && copier_args+=(--vcs-ref "$vcs_ref")
+    [[ "$defaults" == 1 ]] && copier_args+=(--defaults)
+    nix run nixpkgs#copier -- "${copier_args[@]}" "$template" "$project_name"
 
-    print_info "Configuring template for project: $project_name (type: $project_type)"
+    cd "$project_name"
+    git init -q -b "$(sed -n 's/^default_branch: //p' .copier-answers.yml)"
+    git add -A
 
-    rename_package_directory "zamazingo" "$project_name"
-    replace_content "zamazingo" "$project_name" "$project_type"
-    patch_for_type "$python_name" "$project_name" "$project_type"
-    update_readme "$project_name" "$project_type"
-    setup_dev_rails
+    # The template ships flake.lock without the pythonproject input; locking
+    # adds it, pinning the rails checker this project is held to.
+    print_info "Pinning flake inputs..."
+    nix flake lock
     install_skills
 
-    init_git "$project_name" "$git_mode"
-    setup_docker_secrets "$project_name"
+    git add -A
+    git commit -q -m "Initial commit: $project_name from the pythonproject template"
+    print_success "Git repository initialised"
 
-    print_info "Removing setup script"
-    rm -f "create-python-project.sh"
+    setup_github_remote "$project_name"
+    [[ "$project_type" != "library" ]] && setup_docker_secrets "$project_name"
 
-    # Rename the project directory if it is still called 'pythonproject'
-    local current_dir
-    current_dir="$(basename "$PWD")"
-    if [[ "$current_dir" == "pythonproject" ]]; then
-        local parent_dir
-        parent_dir="$(dirname "$PWD")"
-        cd "$parent_dir"
-        mv "pythonproject" "$project_name"
-        print_success "Renamed project directory: pythonproject → $project_name"
-        cd "$project_name"
-    fi
-
-    print_success "Project '$project_name' configured successfully!"
+    print_success "Project '$project_name' generated."
     echo ""
-    print_info "Next steps (run inside 'nix develop'):"
-    print_info "  1. cd ../$project_name          # if not already there"
+    print_info "Next steps:"
+    print_info "  1. cd $project_name"
     print_info "  2. nix develop                  # also runs npm install --silent"
     print_info "  3. nox                          # verify baseline passes"
     print_info "  4. pre-commit install           # wire up the git hook"

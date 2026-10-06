@@ -1,0 +1,64 @@
+# Pulls pythonproject template changes into this repo as a pull request.
+#
+# Runs `copier update` against the latest template tag. Copier merges three-way,
+# so local edits to managed files survive; genuine overlaps are left as inline
+# conflict markers, which fail the quality gate on the PR until a human
+# resolves them.
+#
+# Needs a TEMPLATE_UPDATE_TOKEN secret (fine-grained PAT: contents, pull
+# requests and workflows read/write on this repo). The built-in GITHUB_TOKEN
+# cannot push changes under .github/workflows/, which template updates often
+# touch, and PRs it opens do not trigger CI.
+
+name: Template update
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.TEMPLATE_UPDATE_TOKEN || github.token }}
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Copier update
+        id: update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          before=$(grep '^_commit:' .copier-answers.yml)
+          nix run nixpkgs#copier -- update --trust --defaults --conflict inline
+          after=$(grep '^_commit:' .copier-answers.yml)
+          echo "version=${after#_commit: }" >> "$GITHUB_OUTPUT"
+          if git diff --quiet && [ "$before" = "$after" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open pull request
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.TEMPLATE_UPDATE_TOKEN || github.token }}
+          branch: chore/template-update
+          title: "Update from pythonproject template ${{ steps.update.outputs.version }}"
+          commit-message: "Update from pythonproject template ${{ steps.update.outputs.version }}"
+          body: |
+            Automated `copier update` to pythonproject `${{ steps.update.outputs.version }}`.
+
+            Search the diff for `<<<<<<<` — any conflict markers are places where a
+            template change overlapped a local edit and need resolving by hand.
+          delete-branch: true

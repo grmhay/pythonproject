@@ -1,4 +1,4 @@
-# zamazingo
+# pythonproject
 
 A Python project template that scaffolds CLI and API projects with built-in tooling for human-agent collaboration on GitHub Issues.
 

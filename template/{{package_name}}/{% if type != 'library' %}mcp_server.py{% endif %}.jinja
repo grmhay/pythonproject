@@ -2,9 +2,9 @@
 
 from fastmcp import FastMCP
 
-from zamazingo import __version__
+from {{ package_name }} import __version__
 
-mcp = FastMCP("zamazingo")
+mcp = FastMCP("{{ project_name }}")
 
 
 @mcp.tool

@@ -1,0 +1,19 @@
+"""This module provides the FastAPI application."""
+
+import uvicorn
+from fastapi import FastAPI
+
+from {{ package_name }} import __version__
+
+app = FastAPI(title="{{ project_name }}", version=__version__)
+
+
+@app.get("/")
+def read_root() -> dict[str, str]:
+    """Return a welcome message."""
+    return {"message": f"Hello from {{ project_name }} v{__version__}!"}
+
+
+def run() -> None:
+    """Run the API server."""
+    uvicorn.run("{{ package_name }}.api:app", host="0.0.0.0", port=8000, reload=False)  # noqa: S104
