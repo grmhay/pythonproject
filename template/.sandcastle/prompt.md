@@ -41,10 +41,17 @@ Do not commit until `nox` passes cleanly.
 
 1. Commit your changes with a message that explains the why, not the what.
 
-2. Update the issue labels:
+2. Take the issue out of the agent queue:
    ```
-   gh issue edit {{ISSUE_NUMBER}} --remove-label ready-for-agent --add-label ready-for-human
+   gh issue edit {{ISSUE_NUMBER}} --remove-label ready-for-agent
    ```
+
+   Remove that label and add nothing in its place. It must go, or the next run
+   picks the issue up again and repeats your work. But an issue with a pull
+   request open against it is no longer in any triage state: `ready-for-human`
+   means "requires human implementation", which is not what happened here, and
+   the PR closes the issue on merge — so it would close carrying a label that
+   contradicts its own history.
 
 3. Open a pull request:
    ```

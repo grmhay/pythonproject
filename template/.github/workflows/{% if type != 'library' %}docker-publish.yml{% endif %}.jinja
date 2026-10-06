@@ -53,6 +53,9 @@ jobs:
       # The image repository this build published to, so the deploy-PR job does
       # not have to reconstruct it from a secret.
       image: ${{ steps.image.outputs.value }}
+      # Whether OPS_DEPLOY_PAT is configured. The deploy-PR job is skipped
+      # rather than failed when it is absent, e.g. in a newly generated repo.
+      deploy-pr-enabled: ${{ steps.pat.outputs.present }}
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
@@ -101,6 +104,17 @@ jobs:
             type=sha,prefix=sha-,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Check whether the deploy-PR token is configured
+        id: pat
+        env:
+          OPS_DEPLOY_PAT: ${{ secrets.OPS_DEPLOY_PAT }}
+        run: |
+          if [ -n "$OPS_DEPLOY_PAT" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -136,11 +150,15 @@ jobs:
   # Opens or updates the single deploy/<stack> PR in the ops control plane,
   # bumping the pinned digest to this build. Merging that PR is the approval
   # point; the reconciler rolls it out from there. Stays dormant until the
-  # image actually publishes, since digest is empty until then.
+  # image actually publishes, since digest is empty until then, and is skipped
+  # rather than failed while OPS_DEPLOY_PAT is unset.
   deploy-pr:
     needs: build-and-push
 {%- endraw %}
-    if: github.ref == 'refs/heads/{{ default_branch }}' && needs.build-and-push.outputs.digest != ''
+    if: >-
+      github.ref == 'refs/heads/{{ default_branch }}' &&
+      needs.build-and-push.outputs.digest != '' &&
+      needs.build-and-push.outputs.deploy-pr-enabled == 'true'
 {%- raw %}
     uses: grmhay/homelab-opscontrolplane/.github/workflows/deploy-pr.yml@master
     with:
