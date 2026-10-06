@@ -28,6 +28,9 @@ merges template changes into it three-way, so local edits survive.
 - Files are split into template-managed and project-owned (`_skip_if_exists`).
   Project-owned files (`pyproject.toml`, `CLAUDE.md`, the package, ...) are not
   updated; the rails checker still enforces their invariants.
-- GitHub Actions workflows are not Jinja-templated, because `${{ }}` collides
-  with Jinja syntax; type-dependent workflows are selected by templated
-  filenames instead.
+- GitHub Actions `${{ }}` expressions collide with Jinja, so a templated
+  workflow wraps everything except its templated lines (the default branch) in
+  `{% raw %}`. Type-dependent workflows are selected by templated filenames.
+- The template converged on what the services had independently arrived at:
+  setuptools-scm versions, multi-arch (amd64 + arm64) images with SBOM and
+  provenance, and a configurable default branch.

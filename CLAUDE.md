@@ -16,7 +16,7 @@ Or by session: `nox -s mypy`, `nox -s pytest`, `nox -s check`
 
 ## Template
 - `template/` is rendered by Copier; files ending `.jinja` are templated, others are copied verbatim
-- Never put `${{ }}` GitHub Actions expressions in a `.jinja` file; workflows stay plain YAML
+- GitHub Actions `${{ }}` expressions collide with Jinja: a templated workflow (`.yml.jinja`) wraps everything outside the templated lines in `{% raw %}` … `{% endraw %}`
 - Any change under `template/` must keep `nox` green: the tests render every project type and run the rails checker on it
 - Adding a file the project should own after generation? List it in `_skip_if_exists` in `copier.yml`
 

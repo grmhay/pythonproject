@@ -1,6 +1,6 @@
 [project]
 name = "{{ project_name }}"
-version = "0.0.0"
+dynamic = ["version"]
 description = "{{ description }}"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -58,12 +58,20 @@ test = [{% if type in ['api', 'both'] %}"httpx", {% endif %}"mypy", "nox", "pyte
 
 [build-system]
 
-requires = ["setuptools"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 ##############################
 ## SETUPTOOLS CONFIGURATION ##
 ##############################
+
+# Version is derived from git tags by setuptools-scm; never hardcode it.
+# The .git directory is absent from the container build context, so the image
+# build passes the computed value via SETUPTOOLS_SCM_PRETEND_VERSION; this
+# fallback is used only when neither git metadata nor that env var is available.
+[tool.setuptools_scm]
+
+fallback_version = "0.0.0+unknown"
 
 [tool.setuptools.packages.find]
 

@@ -258,7 +258,7 @@ main() {
     nix run nixpkgs#copier -- "${copier_args[@]}" "$template" "$project_name"
 
     cd "$project_name"
-    git init -q -b main
+    git init -q -b "$(sed -n 's/^default_branch: //p' .copier-answers.yml)"
     git add -A
 
     # The template ships flake.lock without the pythonproject input; locking

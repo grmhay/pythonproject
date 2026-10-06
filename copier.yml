@@ -28,6 +28,8 @@ _skip_if_exists:
   - "/Dockerfile"
   - "/docs/adr/**"
   - "/noxfile_local.py"
+  - "/.claude/settings.json"
+  - "/flake.lock"
 
 _exclude:
   - "copier.yml"
@@ -47,6 +49,8 @@ _exclude:
   - "{% if _copier_operation == 'update' %}/Dockerfile{% endif %}"
   - "{% if _copier_operation == 'update' %}/docs/adr{% endif %}"
   - "{% if _copier_operation == 'update' %}/noxfile_local.py{% endif %}"
+  - "{% if _copier_operation == 'update' %}/.claude/settings.json{% endif %}"
+  - "{% if _copier_operation == 'update' %}/flake.lock{% endif %}"
 
 project_name:
   type: str
@@ -93,6 +97,11 @@ author_email:
   type: str
   help: Author email
   default: grmhay@gmail.com
+
+default_branch:
+  type: str
+  help: Default git branch; CI and the deploy PR trigger on it
+  default: main
 
 github_owner:
   type: str
