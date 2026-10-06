@@ -1,4 +1,4 @@
-FROM node:22-bookworm
+FROM node:24-bookworm
 
 RUN apt-get update && apt-get install -y \
   curl \
@@ -19,16 +19,27 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
-# UID/GID alignment so bind-mounted files share ownership with the host user
+# UID/GID alignment so bind-mounted files share ownership with the host user.
+# The target GID may already exist in the base image (100 is "users" on
+# Debian), in which case the node group keeps its own GID and the agent user
+# simply joins the existing one — renaming it would fail.
 ARG AGENT_UID=1000
 ARG AGENT_GID=1000
-RUN groupmod -g $AGENT_GID node \
-    && usermod -u $AGENT_UID -g $AGENT_GID -d /home/agent -m -l agent node
+RUN { getent group "$AGENT_GID" >/dev/null || groupmod -g "$AGENT_GID" node; } \
+    && usermod -u "$AGENT_UID" -g "$AGENT_GID" -d /home/agent -m -l agent node
 USER ${AGENT_UID}:${AGENT_GID}
 
 # Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
 ENV PATH="/home/agent/.local/bin:$PATH"
+
+# Pre-accept the workspace trust dialog. Claude Code ignores the repo's
+# .claude/settings.json permissions in an untrusted workspace, and the dialog
+# can only be accepted interactively — which nothing in a sandbox can do, so
+# without this every agent runs without the project's permission allowlist.
+ARG AGENT_WORKSPACE=/home/agent/workspace
+RUN printf '{"projects":{"%s":{"hasTrustDialogAccepted":true}}}\n' \
+      "$AGENT_WORKSPACE" > /home/agent/.claude.json
 
 # Python dev tools (user install to stay in agent home)
 # All nox sessions use python=False and call tools as external processes,

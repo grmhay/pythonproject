@@ -18,7 +18,27 @@ if (issues.length === 0) {
   process.exit(0);
 }
 
-for (const issue of issues) {
+// Issue numbers may be passed as arguments to run a subset in a chosen order:
+// `npm run sandcastle -- 9 5`. Sequencing matters when two issues touch the
+// same code, since every agent branches off main and cannot see the others.
+const requested = process.argv.slice(2).map(Number);
+
+const unknown = requested.filter((n) => !issues.some((i) => i.number === n));
+if (unknown.length > 0) {
+  console.error(
+    `Not open with label ready-for-agent: ${unknown.map((n) => `#${n}`).join(", ")}`
+  );
+  process.exit(1);
+}
+
+const queue =
+  requested.length > 0
+    ? requested.map((n) => issues.find((i) => i.number === n)!)
+    : issues;
+
+console.log(`Queued: ${queue.map((i) => `#${i.number}`).join(", ")}`);
+
+for (const issue of queue) {
   console.log(`\nProcessing issue #${issue.number}: ${issue.title}`);
 
   await run({

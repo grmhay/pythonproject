@@ -19,6 +19,14 @@
         ## Get project specification:
         project = pyproject.project;
 
+        ## Version for nix-built artifacts. setuptools-scm derives the real one
+        ## from git tags in CI; a flake source has no .git, so the flake's own
+        ## revision is the only git fact available here. Using it keeps a
+        ## nix-built artifact identifiable instead of stamping every build with
+        ## the same placeholder.
+        revision = self.shortRev or self.dirtyShortRev or "unknown";
+        version = project.version or "0.0.0+g${revision}";
+
         ## Strip version specifiers and extras from a PEP 508 dependency name:
         depName = dep: builtins.head (builtins.split "[>=<;![ \t]" dep);
 
@@ -37,14 +45,10 @@
           ## Set the package name:
           pname = project.name;
 
-          ## The version is dynamic (setuptools-scm), so project.version is
-          ## normally absent; the dev shell does not need a real one.
-          version = project.version or "0.0.0+dev";
-
           ## The build source is a nix store path with no .git, so setuptools-scm
-          ## cannot derive a version here. Pin it to the derivation version so the
-          ## wheel is reproducible (mirrors the container's build-arg approach).
-          SETUPTOOLS_SCM_PRETEND_VERSION = project.version or "0.0.0+dev";
+          ## cannot derive a version itself; hand it the revision-based one.
+          inherit version;
+          SETUPTOOLS_SCM_PRETEND_VERSION = version;
 
           ## Set the package format:
           format = "pyproject";
@@ -83,7 +87,7 @@
           pname = project.name;
           ## A library has no [project.scripts] table.
           scripts = project.scripts or { };
-          version = project.version or "0.0.0+dev";
+          inherit version;
           root = "$PWD";
         };
       in
