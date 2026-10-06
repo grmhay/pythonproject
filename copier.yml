@@ -13,16 +13,21 @@ _min_copier_version: "9.0"
 _subdirectory: template
 _answers_file: .copier-answers.yml
 
+# Project-owned paths. On the first copy they are written only if absent; on
+# update they are excluded from both the old and new renders, so Copier never
+# touches them -- not even to recreate one the project deleted. Patterns are
+# anchored with a leading "/": unanchored, "Dockerfile" would also match
+# .sandcastle/Dockerfile, and update would silently drop template changes to it.
 _skip_if_exists:
-  - "{{ package_name }}/**"
-  - "tests/**"
-  - pyproject.toml
-  - README.md
-  - CONTEXT.md
-  - CLAUDE.md
-  - Dockerfile
-  - "docs/adr/**"
-  - noxfile_local.py
+  - "/{{ package_name }}/**"
+  - "/tests/**"
+  - "/pyproject.toml"
+  - "/README.md"
+  - "/CONTEXT.md"
+  - "/CLAUDE.md"
+  - "/Dockerfile"
+  - "/docs/adr/**"
+  - "/noxfile_local.py"
 
 _exclude:
   - "copier.yml"
@@ -33,6 +38,15 @@ _exclude:
   - ".DS_Store"
   - "node_modules"
   - ".sandcastle/.env"
+  - "{% if _copier_operation == 'update' %}/{{ package_name }}{% endif %}"
+  - "{% if _copier_operation == 'update' %}/tests{% endif %}"
+  - "{% if _copier_operation == 'update' %}/pyproject.toml{% endif %}"
+  - "{% if _copier_operation == 'update' %}/README.md{% endif %}"
+  - "{% if _copier_operation == 'update' %}/CONTEXT.md{% endif %}"
+  - "{% if _copier_operation == 'update' %}/CLAUDE.md{% endif %}"
+  - "{% if _copier_operation == 'update' %}/Dockerfile{% endif %}"
+  - "{% if _copier_operation == 'update' %}/docs/adr{% endif %}"
+  - "{% if _copier_operation == 'update' %}/noxfile_local.py{% endif %}"
 
 project_name:
   type: str
