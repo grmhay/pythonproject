@@ -27,19 +27,24 @@ jobs:
       # the package's checkPhase, using the exact tool versions pinned in
       # flake.lock. This keeps CI identical to local `nix develop` and stops the
       # two drifting apart. `.#default` rather than `.#<name>` so it keeps
-      # working after create-python-project.sh renames the package.
+      # working whatever the package is called.
       - name: Quality gate (nox via nix flake)
         run: nix build '.#default' -L
 
+  # Independent of this repo's own noxfile: catches a project that
+  # dropped the rails session or narrowed its spec, which `quality` cannot see.
+  rails-check:
+    uses: grmhay/pythonproject/.github/workflows/rails-check.yml@main
+
   build-and-push:
-    needs: quality
+    needs: [quality, rails-check]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       # The manifest digest, handed to the deploy-PR job below so the control
-      # plane pins this exact build. Empty on pull_request builds and on the
-      # unrenamed template, neither of which push.
+      # plane pins this exact build. Empty on pull_request builds, which do
+      # not push.
       digest: ${{ steps.push.outputs.digest }}
       # The image repository this build published to, so the deploy-PR job does
       # not have to reconstruct it from a secret.
@@ -63,7 +68,6 @@ jobs:
       - name: Log in to Docker Hub
         if: |
           github.event_name != 'pull_request' &&
-          steps.project.outputs.name != 'zamazingo' &&
           env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@v3
         with:
@@ -89,8 +93,23 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' && steps.project.outputs.name != 'zamazingo' && env.DOCKERHUB_USERNAME != '' }}
+          push: ${{ github.event_name != 'pull_request' && env.DOCKERHUB_USERNAME != '' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Opens or updates the single deploy/<stack> PR in the ops control plane,
+  # bumping the pinned digest to this build. Merging that PR is the approval
+  # point; the reconciler rolls it out from there. Stays dormant until the
+  # image actually publishes, since digest is empty until then.
+  deploy-pr:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && needs.build-and-push.outputs.digest != ''
+    uses: grmhay/homelab-opscontrolplane/.github/workflows/deploy-pr.yml@master
+    with:
+      image: ${{ needs.build-and-push.outputs.image }}
+      digest: ${{ needs.build-and-push.outputs.digest }}
+      source-sha: ${{ github.sha }}
+    secrets:
+      token: ${{ secrets.OPS_DEPLOY_PAT }}

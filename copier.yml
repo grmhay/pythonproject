@@ -1,0 +1,86 @@
+# Copier template for grmhay Python projects.
+#
+#   New project:     nix run nixpkgs#copier -- copy --trust gh:grmhay/pythonproject <dir>
+#   Pull updates:    nix run nixpkgs#copier -- update --trust   (inside a project)
+#
+# Files under template/ split into two kinds. Tooling the rails depend on
+# (noxfile, flake, CI, sandbox loop, pre-commit, DEV_RAILS.md) is managed:
+# `copier update` merges template changes into it three-way, so local edits
+# survive. Everything listed in _skip_if_exists is written once at generation
+# and then belongs to the project.
+
+_min_copier_version: "9.0"
+_subdirectory: template
+_answers_file: .copier-answers.yml
+
+_skip_if_exists:
+  - "{{ package_name }}/**"
+  - "tests/**"
+  - pyproject.toml
+  - README.md
+  - CONTEXT.md
+  - CLAUDE.md
+  - Dockerfile
+  - "docs/adr/**"
+  - noxfile_local.py
+
+_exclude:
+  - "copier.yml"
+  - "~*"
+  - "*.py[co]"
+  - "__pycache__"
+  - ".git"
+  - ".DS_Store"
+  - "node_modules"
+  - ".sandcastle/.env"
+
+project_name:
+  type: str
+  help: Project (distribution) name, lowercase with hyphens, e.g. dns-service
+  validator: >-
+    {% if not (project_name | regex_search('^[a-z][a-z0-9-]*[a-z0-9]$')) %}
+    Use lowercase letters, digits and hyphens; start with a letter.
+    {% endif %}
+
+package_name:
+  type: str
+  help: Python import name
+  default: "{{ project_name | replace('-', '_') }}"
+  validator: >-
+    {% if not (package_name | regex_search('^[a-z][a-z0-9_]*$')) %}
+    Must be a valid lowercase Python identifier.
+    {% endif %}
+
+type:
+  type: str
+  help: What kind of project is this?
+  choices:
+    CLI (Click): cli
+    API (FastAPI + uvicorn): api
+    CLI and API: both
+    Library (no entry points, no container): library
+  default: cli
+
+description:
+  type: str
+  help: One-line description
+  default: >-
+    {%- if type == 'cli' -%}A Python CLI application.
+    {%- elif type == 'api' -%}A Python API application.
+    {%- elif type == 'both' -%}A Python application with CLI and API.
+    {%- else -%}A Python library.{%- endif -%}
+
+author_name:
+  type: str
+  help: Author name
+  default: Graeme Hay
+
+author_email:
+  type: str
+  help: Author email
+  default: grmhay@gmail.com
+
+github_owner:
+  type: str
+  help: GitHub user or organisation that owns the repository
+  default: grmhay

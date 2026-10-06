@@ -1,12 +1,13 @@
 {
-  description = "Copier template for grmhay Python projects, and the canonical dev-rails checker";
+  description = "{{ description }}";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    pythonproject.url = "github:grmhay/pythonproject";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }:
+  outputs = { self, nixpkgs, flake-utils, pythonproject, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         ## Import nixpkgs:
@@ -27,10 +28,9 @@
         ## Resolve test Python dependencies from pyproject.toml:
         testDeps = map (dep: pkgs.python3Packages.${depName dep}) project."optional-dependencies".test;
 
-        ## The canonical dev-rails checker. This repo is its source, so it is
-        ## built from ./rails here; generated projects take the same derivation
-        ## from their pythonproject flake input (see template/flake.nix.jinja).
-        railsChecker = import ./rails/checker.nix { inherit pkgs; };
+        ## The canonical dev-rails checker, pinned in flake.lock. One
+        ## definition lives upstream; this repo does not vendor a copy.
+        railsChecker = pythonproject.packages.${system}.check-rails;
 
         ## Get the package:
         package = pkgs.python3Packages.buildPythonPackage {
@@ -55,10 +55,6 @@
           nativeCheckInputs = testDeps ++ [
             pkgs.taplo
 
-            ## copier shells out to git even for a template that is not a
-            ## repo, which is what the test suite renders from in the sandbox.
-            pkgs.git
-
             ## The `rails` session runs inside checkPhase too, so the checker
             ## has to be here as well as in the dev shell.
             railsChecker
@@ -78,7 +74,9 @@
         ## Make our package editable:
         editablePackage = pkgs.python3.pkgs.mkPythonEditablePackage {
           pname = project.name;
-          inherit (project) scripts version;
+          ## A library has no [project.scripts] table.
+          scripts = project.scripts or { };
+          inherit (project) version;
           root = "$PWD";
         };
       in
@@ -86,7 +84,6 @@
         ## Project packages output:
         packages = {
           "${project.name}" = package;
-          check-rails = railsChecker;
           default = self.packages.${system}.${project.name};
         };
 

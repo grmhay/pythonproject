@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      # Runs every nox session (taplo, format, check, mypy, pytest, rails) via
+      # the package's checkPhase, using the exact tool versions pinned in
+      # flake.lock. This keeps CI identical to local `nix develop` and stops the
+      # two drifting apart. `.#default` rather than `.#<name>` so it keeps
+      # working whatever the package is called.
+      - name: Quality gate (nox via nix flake)
+        run: nix build '.#default' -L
+
+  # Independent of this repo's own noxfile: catches a project that
+  # dropped the rails session or narrowed its spec, which `quality` cannot see.
+  rails-check:
+    uses: grmhay/pythonproject/.github/workflows/rails-check.yml@main
