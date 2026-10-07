@@ -455,6 +455,22 @@ nox -s pytest          # unit tests + doctests
 
 ---
 
+## Phase 2a: Fleet conventions and the API contract
+
+**Fleet conventions.** Services generated with `fleet_common: true` depend on
+[homelab-fleet-common](https://github.com/grmhay/homelab-fleet-common). It is
+pinned twice: pyproject.toml names a release tarball (what the Docker build
+installs) and flake.nix takes the same package from the `homelab-fleet-common`
+flake input (pinned in flake.lock). To upgrade, bump the tag in the pyproject
+URL and run `nix flake update homelab-fleet-common`.
+
+**API contract.** A project with `openapi-app = "module:app"` under
+`[tool.pythonproject]` commits its OpenAPI document as `openapi.json`. The
+`openapi` nox session fails the gate when the file no longer matches the app;
+regenerate it with `nox -s openapi -- --write` and commit it with the API
+change. Each version tag attaches `openapi.json` to the GitHub release, and
+consumers pin their contract tests to the release they deploy.
+
 ## Phase 2b: The gate in CI, and the deploy PR
 
 The pre-commit hook is bypassable with `--no-verify`, and it does not exist at

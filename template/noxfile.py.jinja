@@ -16,6 +16,8 @@ A few examples for invoking `nox`:
 
 import importlib
 import sys
+import tempfile
+import tomllib
 from pathlib import Path
 
 import nox
@@ -86,6 +88,45 @@ def rails(session: nox.Session) -> None:
 def mypy(session: nox.Session) -> None:
     """Type-check on the codebase."""
     session.run("mypy", "--no-install-types", *paths, external=True)
+
+
+#: Renders an app's OpenAPI document. Runs in a subprocess so it imports the
+#: app with the project's own interpreter and dependencies, not nox's.
+_OPENAPI_SCRIPT = """
+import importlib, json, sys
+module, _, attr = sys.argv[1].partition(":")
+spec = getattr(importlib.import_module(module), attr).openapi()
+# The app version changes on every commit; the contract does not.
+spec["info"]["version"] = "0.0.0"
+with open(sys.argv[2], "w") as f:
+    f.write(json.dumps(spec, indent=2, sort_keys=True) + "\\n")
+"""
+
+
+@nox.session(python=False)
+def openapi(session: nox.Session) -> None:
+    """Check the committed openapi.json matches the API; --write regenerates it.
+
+    Consumers test against this file, so an API change cannot merge without
+    updating it. Enabled by `openapi-app = "module:app"` under
+    [tool.pythonproject] in pyproject.toml; skipped otherwise.
+    """
+    with Path("pyproject.toml").open("rb") as f:
+        config = tomllib.load(f).get("tool", {}).get("pythonproject", {})
+    app = config.get("openapi-app")
+    if not app:
+        session.skip("no openapi-app under [tool.pythonproject] in pyproject.toml")
+
+    committed = Path("openapi.json")
+    if "--write" in session.posargs:
+        session.run("python", "-c", _OPENAPI_SCRIPT, app, str(committed), external=True)
+        return
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fresh = Path(tmp) / "openapi.json"
+        session.run("python", "-c", _OPENAPI_SCRIPT, app, str(fresh), external=True)
+        if not committed.exists() or committed.read_text() != fresh.read_text():
+            session.error("openapi.json is stale; run `nox -s openapi -- --write`")
 
 
 @nox.session(python=False)

@@ -35,6 +35,30 @@ jobs:
       - name: Quality gate (nox via nix flake)
         run: nix build '.#default' -L
 
+  # Attaches the committed OpenAPI document to the GitHub release for a version
+  # tag, so consumers can pin their contract tests to the release they deploy.
+  release-openapi:
+    needs: quality
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Upload openapi.json to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ ! -f openapi.json ]; then
+            echo "No openapi.json in this project; nothing to publish."
+            exit 0
+          fi
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --generate-notes
+          gh release upload "$TAG" openapi.json --clobber
+
   # Independent of this repo's own noxfile: catches a project that
   # dropped the rails session or narrowed its spec, which `quality` cannot see.
   rails-check:

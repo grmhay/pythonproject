@@ -26,11 +26,38 @@ classifiers = [
 {% if type == 'library' -%}
 dependencies = []
 {%- elif type == 'cli' -%}
+{% if fleet_common -%}
+dependencies = [
+  "click",
+  "fastmcp",
+  "homelab-fleet-common @ https://github.com/grmhay/homelab-fleet-common/archive/refs/tags/{{ fleet_common_version }}.tar.gz",
+]
+{%- else -%}
 dependencies = ["click", "fastmcp"]
+{%- endif %}
 {%- elif type == 'api' -%}
+{% if fleet_common -%}
+dependencies = [
+  "fastapi",
+  "fastmcp",
+  "uvicorn",
+  "homelab-fleet-common @ https://github.com/grmhay/homelab-fleet-common/archive/refs/tags/{{ fleet_common_version }}.tar.gz",
+]
+{%- else -%}
 dependencies = ["fastapi", "fastmcp", "uvicorn"]
+{%- endif %}
+{%- else -%}
+{% if fleet_common -%}
+dependencies = [
+  "click",
+  "fastapi",
+  "fastmcp",
+  "uvicorn",
+  "homelab-fleet-common @ https://github.com/grmhay/homelab-fleet-common/archive/refs/tags/{{ fleet_common_version }}.tar.gz",
+]
 {%- else -%}
 dependencies = ["click", "fastapi", "fastmcp", "uvicorn"]
+{%- endif %}
 {%- endif %}
 
 [project.optional-dependencies]
@@ -83,6 +110,18 @@ exclude = ["tests*"]
 
 {{ package_name }} = ["resources/*"]
 
+{% if type in ['api', 'both'] -%}
+##############################
+## PYTHONPROJECT TEMPLATE   ##
+##############################
+
+[tool.pythonproject]
+
+## The FastAPI app whose OpenAPI document `nox -s openapi` keeps in
+## openapi.json, for consumers' contract tests.
+openapi-app = "{{ package_name }}.api:app"
+
+{% endif -%}
 ##########################
 ## PYTEST CONFIGURATION ##
 ##########################
@@ -227,6 +266,12 @@ select = [
 
 ## Ignore specific rules or categories:
 ignore = ["COM812"]
+
+[tool.ruff.lint.per-file-ignores]
+
+## The fleet-standard test exemptions: pytest is built on bare asserts, tests
+## compare against literal expected values, and fixtures import lazily.
+"tests/**/*.py" = ["S101", "PLR2004", "PLC0415"]
 
 [tool.ruff.lint.pydocstyle]
 

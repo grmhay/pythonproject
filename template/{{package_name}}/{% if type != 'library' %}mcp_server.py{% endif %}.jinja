@@ -1,6 +1,9 @@
 """This module provides the MCP server."""
 
 from fastmcp import FastMCP
+{%- if fleet_common %}
+from homelab_fleet.mcp import McpConfig
+{%- endif %}
 
 from {{ package_name }} import __version__
 
@@ -20,5 +23,10 @@ def version_resource() -> str:
 
 
 def run() -> None:
+{%- if fleet_common %}
+    """Run the MCP server over the transport MCP_TRANSPORT selects."""
+    mcp.run(**McpConfig.from_env().run_kwargs())
+{%- else %}
     """Run the MCP server."""
     mcp.run()
+{%- endif %}
