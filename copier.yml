@@ -30,6 +30,7 @@ _skip_if_exists:
   - "/noxfile_local.py"
   - "/.claude/settings.json"
   - "/flake.lock"
+  - "/openapi.json"
 
 _exclude:
   - "copier.yml"
@@ -51,6 +52,7 @@ _exclude:
   - "{% if _copier_operation == 'update' %}/noxfile_local.py{% endif %}"
   - "{% if _copier_operation == 'update' %}/.claude/settings.json{% endif %}"
   - "{% if _copier_operation == 'update' %}/flake.lock{% endif %}"
+  - "{% if _copier_operation == 'update' %}/openapi.json{% endif %}"
 
 project_name:
   type: str
@@ -97,6 +99,18 @@ author_email:
   type: str
   help: Author email
   default: grmhay@gmail.com
+
+fleet_common:
+  type: bool
+  help: Use homelab-fleet-common for fleet conventions (MCP transport settings)?
+  default: "{{ type != 'library' }}"
+  when: "{{ type != 'library' }}"
+
+fleet_common_version:
+  type: str
+  help: homelab-fleet-common release tag to pin in pyproject.toml
+  default: v0.1.0
+  when: "{{ fleet_common }}"
 
 default_branch:
   type: str

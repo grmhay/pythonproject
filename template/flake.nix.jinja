@@ -5,9 +5,18 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     pythonproject.url = "github:grmhay/pythonproject";
+{%- if fleet_common %}
+
+    ## Fleet conventions. Follows this flake's nixpkgs so the package is built
+    ## against the same Python as everything else; pinned in flake.lock.
+    homelab-fleet-common = {
+      url = "github:grmhay/homelab-fleet-common";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+{%- endif %}
   };
 
-  outputs = { self, nixpkgs, flake-utils, pythonproject, ... }:
+  outputs = { self, nixpkgs, flake-utils, pythonproject, {% if fleet_common %}homelab-fleet-common, {% endif %}... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         ## Import nixpkgs:
@@ -30,11 +39,23 @@
         ## Strip version specifiers and extras from a PEP 508 dependency name:
         depName = dep: builtins.head (builtins.split "[>=<;![ \t]" dep);
 
+        ## Packages that come from flake inputs rather than nixpkgs, keyed by
+        ## their pyproject.toml name. pyproject pins a URL for pip (the Docker
+        ## build); the flake input supplies the same package to nix.
+        flakePackages = {
+{%- if fleet_common %}
+          homelab-fleet-common = homelab-fleet-common.packages.${system}.default;
+{%- endif %}
+        };
+
+        ## Resolve a PEP 508 dependency to a nix package:
+        resolveDep = dep: flakePackages.${depName dep} or pkgs.python3Packages.${depName dep};
+
         ## Resolve runtime Python dependencies from pyproject.toml:
-        pythonDeps = map (dep: pkgs.python3Packages.${depName dep}) project.dependencies;
+        pythonDeps = map resolveDep project.dependencies;
 
         ## Resolve test Python dependencies from pyproject.toml:
-        testDeps = map (dep: pkgs.python3Packages.${depName dep}) project."optional-dependencies".test;
+        testDeps = map resolveDep project."optional-dependencies".test;
 
         ## The canonical dev-rails checker, pinned in flake.lock. One
         ## definition lives upstream; this repo does not vendor a copy.
