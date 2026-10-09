@@ -8,7 +8,10 @@
 # Needs a TEMPLATE_UPDATE_TOKEN secret (fine-grained PAT: contents, pull
 # requests and workflows read/write on this repo). The built-in GITHUB_TOKEN
 # cannot push changes under .github/workflows/, which template updates often
-# touch, and PRs it opens do not trigger CI.
+# touch, and PRs it opens do not trigger CI. The first step fails fast with
+# that explanation when the secret is missing, instead of letting the push
+# fail later with "refusing to allow a GitHub App to create or update
+# workflow".
 
 name: Template update
 
@@ -24,11 +27,20 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Require TEMPLATE_UPDATE_TOKEN
+        env:
+          TOKEN: ${{ secrets.TEMPLATE_UPDATE_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error title=TEMPLATE_UPDATE_TOKEN is not set::Add a fine-grained PAT with contents, pull requests and workflows read/write on this repo as the TEMPLATE_UPDATE_TOKEN secret. The built-in GITHUB_TOKEN cannot push workflow-file changes, and PRs it opens do not trigger CI."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.TEMPLATE_UPDATE_TOKEN || github.token }}
+          token: ${{ secrets.TEMPLATE_UPDATE_TOKEN }}
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
@@ -52,7 +64,7 @@ jobs:
         if: steps.update.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.TEMPLATE_UPDATE_TOKEN || github.token }}
+          token: ${{ secrets.TEMPLATE_UPDATE_TOKEN }}
           branch: chore/template-update
           title: "Update from pythonproject template ${{ steps.update.outputs.version }}"
           commit-message: "Update from pythonproject template ${{ steps.update.outputs.version }}"
