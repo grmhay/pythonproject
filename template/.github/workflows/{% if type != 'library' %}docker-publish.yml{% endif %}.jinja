@@ -74,12 +74,6 @@ jobs:
       # control plane pins this exact build. Empty on pull_request builds, which
       # do not push.
       digest: ${{ steps.push.outputs.digest }}
-      # The image repository this build published to, so the deploy-PR job does
-      # not have to reconstruct it. Built from the dockerhub_namespace template
-      # answer, NOT from the DOCKERHUB_USERNAME secret: GitHub drops any job
-      # output that contains a secret value, which left this empty and failed
-      # the deploy-PR job with "no compose file for stack ''".
-      image: ${{ steps.image.outputs.value }}
       # Whether OPS_DEPLOY_PAT is configured. The deploy-PR job is skipped
       # rather than failed when it is absent, e.g. in a newly generated repo.
       deploy-pr-enabled: ${{ steps.pat.outputs.present }}
@@ -189,7 +183,12 @@ jobs:
 {%- raw %}
     uses: grmhay/homelab-opscontrolplane/.github/workflows/deploy-pr.yml@master
     with:
-      image: ${{ needs.build-and-push.outputs.image }}
+      # Rendered at template time, deliberately not a job output: GitHub drops
+      # any output whose value contains a secret, and the Docker Hub namespace
+      # IS the DOCKERHUB_USERNAME secret's value, so an output carrying the
+      # image name arrives empty ("Skip output 'image' since it may contain
+      # secret") and the deploy-PR job fails with no compose file for stack ''.
+      image: {% endraw %}{{ dockerhub_namespace }}/{{ project_name }}{% raw %}
       digest: ${{ needs.build-and-push.outputs.digest }}
       source-sha: ${{ github.sha }}
     secrets:
