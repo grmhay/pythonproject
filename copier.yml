@@ -121,3 +121,9 @@ github_owner:
   type: str
   help: GitHub user or organisation that owns the repository
   default: grmhay
+
+dockerhub_namespace:
+  type: str
+  help: Docker Hub user or organisation the service image is published under
+  default: "{{ github_owner }}"
+  when: "{{ type != 'library' }}"
