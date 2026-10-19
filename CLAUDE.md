@@ -31,7 +31,7 @@ Issues live in GitHub Issues (`github.com/grmhay/pythonproject`). See `docs/agen
 
 ### Triage labels
 
-Uses the default five-label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+Uses the default five-label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Plus a `blocked` flag for issues waiting on something outside the repo; the Sandcastle loop skips them. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
