@@ -12,6 +12,10 @@ _Avoid_: agent loop, CI loop, automation pipeline
 The `ready-for-agent` label — the human signal that an issue is fully specified and safe for the Sandbox Loop to attempt.
 _Avoid_: AFK-ready, auto-ready, agent-approved
 
+**Blocked flag**:
+The `blocked` label. It sits alongside an issue's state label, not in place of it, while the issue waits on something outside the repo, such as another repo's issue or an upstream release. The blocker is named in the issue body or latest comment.
+_Avoid_: blocker (that means an issue holding other work up), on hold, waiting
+
 **Sandbox**:
 The isolated Docker container in which the agent executes. It has access to the repo via a git worktree but cannot affect the host filesystem directly.
 _Avoid_: container, environment, box
@@ -22,7 +26,8 @@ _Avoid_: bootstrap, initialise, generate
 
 ## Relationships
 
-- The **Sandbox Loop** picks issues that carry the **Agent Gate** label
+- The **Sandbox Loop** picks issues that carry the **Agent Gate** label and not the **Blocked flag**
+- Removing the **Blocked flag** needs no re-triage: the issue keeps its state label
 - Each **Sandbox Loop** run executes inside a **Sandbox** and produces one pull request per issue
 - A **Scaffold** produces a new project that ships with a pre-configured **Sandbox Loop**
 

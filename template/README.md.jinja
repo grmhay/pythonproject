@@ -112,7 +112,8 @@ npx sandcastle docker build-image
 
 ### Running the loop
 
-1. Apply the `ready-for-agent` label to any fully-specified issue
+1. Apply the `ready-for-agent` label to any fully-specified issue. The loop skips issues that also carry
+   `blocked`, which marks an issue waiting on something outside the repo (see `docs/agents/triage-labels.md`)
 2. Run the loop:
    ```sh
    npm run sandcastle
