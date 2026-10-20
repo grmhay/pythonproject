@@ -20,5 +20,5 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 
 - Add `blocked` only when the issue body or latest comment names the blocker, with a link where one exists.
 - Remove it once the blocker clears. The issue keeps its state label, so it does not need re-triage.
-- The Sandcastle loop and agents looking for work skip `ready-for-agent` issues that also carry `blocked`.
+- The Sandbox Loop and agents looking for work skip `ready-for-agent` issues that also carry `blocked`.
 - A wait that the maintainer chose, such as a check deliberately deferred, is not `blocked`.

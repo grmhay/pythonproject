@@ -5,18 +5,17 @@ import { execSync } from "node:child_process";
 interface Issue {
   number: number;
   title: string;
-  labels: { name: string }[];
 }
 
-// A `blocked` issue keeps its ready-for-agent state but waits on something
-// outside the repo, so the loop leaves it alone until the label comes off.
-const issues = (
-  JSON.parse(
-    execSync(
-      "gh issue list --label ready-for-agent --state open --json number,title,labels"
-    ).toString()
-  ) as Issue[]
-).filter((i) => !i.labels.some((l) => l.name === "blocked"));
+// A `blocked` issue keeps the Agent Gate label but waits on something outside
+// the repo, so the Sandbox Loop leaves it alone until the flag comes off. The
+// filter runs on GitHub's side, before --limit, so blocked issues never use up
+// the page (gh's default page is 30 issues).
+const issues = JSON.parse(
+  execSync(
+    'gh issue list --label ready-for-agent --search "-label:blocked" --state open --limit 1000 --json number,title'
+  ).toString()
+) as Issue[];
 
 if (issues.length === 0) {
   console.log("No unblocked issues labelled ready-for-agent. Nothing to do.");
@@ -31,7 +30,7 @@ const requested = process.argv.slice(2).map(Number);
 const unknown = requested.filter((n) => !issues.some((i) => i.number === n));
 if (unknown.length > 0) {
   console.error(
-    `Not open, labelled ready-for-agent and unblocked: ${unknown.map((n) => `#${n}`).join(", ")}`
+    `Not open with label ready-for-agent, or labelled blocked: ${unknown.map((n) => `#${n}`).join(", ")}`
   );
   process.exit(1);
 }

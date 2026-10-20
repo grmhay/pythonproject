@@ -185,6 +185,63 @@ setup_github_remote() {
     print_success "GitHub repo created and pushed: https://github.com/$(gh api user --jq .login)/$project_name"
 }
 
+# ── Triage labels ────────────────────────────────────────────────────────────
+
+# The five triage states plus the `blocked` flag (docs/agents/triage-labels.md).
+# name|colour|description
+TRIAGE_LABELS=(
+    "needs-triage|FBCA04|Maintainer needs to evaluate this issue"
+    "needs-info|D876E3|Waiting on reporter for more information"
+    "ready-for-agent|0E8A16|Fully specified, ready for an AFK agent"
+    "ready-for-human|1D76DB|Requires human implementation"
+    "wontfix|FFFFFF|Will not be actioned"
+    "blocked|B60205|Waiting on something outside this repo; agents skip it"
+)
+
+setup_triage_labels() {
+    local project_name="$1"
+
+    if ! command -v gh &>/dev/null || ! gh auth status &>/dev/null 2>&1; then
+        print_warning "gh CLI missing or not authenticated — skipping triage labels."
+        return 0
+    fi
+
+    local gh_user
+    gh_user=$(gh api user --jq .login 2>/dev/null || echo "")
+    if [[ -z "$gh_user" ]] || ! gh repo view "$gh_user/$project_name" &>/dev/null 2>&1; then
+        print_warning "Repo $gh_user/$project_name not found on GitHub — skipping triage labels."
+        return 0
+    fi
+
+    # Never create anything remote without a human answering: with no
+    # terminal, a timed-out or swallowed prompt would otherwise read as "yes".
+    if [[ ! -t 0 ]]; then
+        print_info "No terminal — skipping triage labels. Run this script's label step by hand later."
+        return 0
+    fi
+
+    echo ""
+    local create_labels=""
+    read -r -t 15 -p "Create the triage labels on $gh_user/$project_name? [Y/n] " create_labels || true
+    create_labels="${create_labels:-Y}"
+    if [[ "$create_labels" =~ ^[Nn]$ ]]; then
+        print_info "Skipping triage labels."
+        return 0
+    fi
+
+    local entry name colour description
+    for entry in "${TRIAGE_LABELS[@]}"; do
+        IFS='|' read -r name colour description <<<"$entry"
+        # --force updates a label that already exists instead of failing.
+        if gh label create "$name" --repo "$gh_user/$project_name" \
+            --color "$colour" --description "$description" --force >/dev/null; then
+            print_success "Label $name on $gh_user/$project_name"
+        else
+            print_warning "Could not create label $name"
+        fi
+    done
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -272,6 +329,7 @@ main() {
     print_success "Git repository initialised"
 
     setup_github_remote "$project_name"
+    setup_triage_labels "$project_name"
     [[ "$project_type" != "library" ]] && setup_docker_secrets "$project_name"
 
     print_success "Project '$project_name' generated."
